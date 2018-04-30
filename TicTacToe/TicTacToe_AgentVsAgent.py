@@ -9,6 +9,10 @@ BLACK = (41, 40, 48)
 YELLOW = (229, 207, 74)
 BLUE = (56, 113, 193)
 WINDOW = (400, 550)
+# PyGame initialization
+pygame.init()
+screen = pygame.display.set_mode(WINDOW)
+pygame.display.set_caption('Tic Tac Toe')
 # Rewards
 GAME_WON = 0
 GAME_LOST = -10
@@ -17,54 +21,88 @@ VALID_MOVE = -0.1
 INVALID_MOVE = -100
 
 
-def play_game(player_x, player_o):
-	# Initialize board and players
-	game_board = Board()
-	players = {player_x.id: player_x, player_o.id: player_o}
-	player_x.start_game()
-	player_o.start_game()
-	current_player = player_x
-	final_result = []
-	# Timer: lower values allow to observe the game, higher values will speed up the game
-	fps = 100
-	fps_clock = pygame.time.Clock()
-	# Game loop
-	while game_board.game_running:
-		fps_clock.tick(fps)
-		# Give rewards when game is won / lost
-		if game_board.gameover():
-			for player_id, player in players.items():
-				if player_id == game_board.winner:
-					reward = GAME_WON
-				else:
-					reward = GAME_LOST
-				player.store_reward(reward)
+class TicTacToeGame(object):
+	def __init__(self, learning_rate=0.3, learning_rate_decay=0.1, episodes=100, write_statistics=False):
+		self.statistic = Statistics()
+		self.write_statistics = write_statistics
+		# Agents and learning variables
+		self.learning_rate = learning_rate
+		self.learning_rate_decay = learning_rate_decay
+		self.player1 = QAgent('X', alpha=self.learning_rate, gamma=0.9, epsilon=0.2)
+		self.player2 = QAgent('O', alpha=self.learning_rate, gamma=0.9, epsilon=0.2)
+		self.start_playing_episodes(episodes)
+
+	def start_playing_episodes(self, episodes):
+		# Start playing episodes
+		for episode in range(episodes):
+			result, winner = self.play_game(self.player1, self.player2)
+			self.statistic.store_rewards(episode, result)
+			self.statistic.count_winner(winner)
+			self.player1.adjust_alpha(self.learning_rate / (1 + episode * self.learning_rate_decay))
+			self.player2.adjust_alpha(self.learning_rate / (1 + episode * self.learning_rate_decay))
+			# Write statistics
+			if self.write_statistics:
+				if episode == episodes // 16 - 1:
+					self.statistic.write_file(self.player1, episode)
+				elif episode == episodes // 8 - 1:
+					self.statistic.write_file(self.player1, episode)
+				elif episode == episodes // 4 - 1:
+					self.statistic.write_file(self.player1, episode)
+				elif episode == episodes // 2 - 1:
+					self.statistic.write_file(self.player1, episode)
+				elif episode == episodes - 1:
+					self.statistic.write_file(self.player1, episode)
+		print("Training finished")
+
+	@staticmethod
+	def play_game(player_x, player_o):
+		# Initialize board and players
+		game_board = Board()
+		players = {player_x.id: player_x, player_o.id: player_o}
+		player_x.start_game()
+		player_o.start_game()
+		current_player = player_x
+		final_result = []
+		# Timer: lower values allow to observe the game, higher values will speed up the game
+		fps = 100
+		fps_clock = pygame.time.Clock()
+		# Game loop
+		while game_board.game_running:
+			fps_clock.tick(fps)
+			# Give rewards when game is won / lost
+			if game_board.gameover():
+				for player_id, player in players.items():
+					if player_id == game_board.winner:
+						reward = GAME_WON
+					else:
+						reward = GAME_LOST
+					player.store_reward(reward)
+					state = game_board.get_board_state()
+					player.update_qtable(state)
+			# Give rewards when game is drawn
+			elif game_board.draw():
+				for player_id, player in players.items():
+					reward = GAME_DRAW
+					player.store_reward(reward)
+					state = game_board.get_board_state()
+					player.update_qtable(state)
+			# Moves of agent
+			else:
+				# Get current board state
 				state = game_board.get_board_state()
-				player.update_qtable(state)
-		# Give rewards when game is drawn
-		elif game_board.draw():
-			for player_id, player in players.items():
-				reward = GAME_DRAW
-				player.store_reward(reward)
-				state = game_board.get_board_state()
-				player.update_qtable(state)
-		# Moves of agent
-		else:
-			# Get current board state
-			state = game_board.get_board_state()
-			current_player.update_qtable(state)
-			# Select action
-			action = current_player.select_action(state)
-			valid_move, reward = game_board.update_board(action, current_player)
-			current_player.store_reward(reward)
-			# Switch player
-			current_player = player_o if current_player == player_x else player_x
-		# Redisplay board
-		pygame.display.flip()
-	# At the end of game return the players' rewards
-	for player_id, player in players.items():
-		final_result.append(player.total_reward)
-	return final_result, game_board.winner
+				current_player.update_qtable(state)
+				# Select action
+				action = current_player.select_action(state)
+				valid_move, reward = game_board.update_board(action, current_player)
+				current_player.store_reward(reward)
+				# Switch player
+				current_player = player_o if current_player == player_x else player_x
+			# Redisplay board
+			pygame.display.flip()
+		# At the end of game return the players' rewards
+		for player_id, player in players.items():
+			final_result.append(player.total_reward)
+		return final_result, game_board.winner
 
 
 class Board(object):
@@ -286,33 +324,5 @@ class Statistics(object):
 
 # Start application
 if __name__ == '__main__':
-	# Game initialization
-	pygame.init()
-	screen = pygame.display.set_mode(WINDOW)
-	pygame.display.set_caption('Tic Tac Toe')
-	statistic = Statistics()
-	# Agents and learning variables
-	learning_rate = 0.3
-	learning_rate_decay = 0.1
-	player1 = QAgent('X', alpha=learning_rate, gamma=0.9, epsilon=0.2)
-	player2 = QAgent('O', alpha=learning_rate, gamma=0.9, epsilon=0.2)
-	episodes = 10000
-	# Start playing episodes
-	for episode in range(episodes):
-		result, winner = play_game(player1, player2)
-		statistic.store_rewards(episode, result)
-		statistic.count_winner(winner)
-		player1.adjust_alpha(learning_rate / (1 + episode * learning_rate_decay))
-		player2.adjust_alpha(learning_rate / (1 + episode * learning_rate_decay))
-		# Write statistics
-		if episode == episodes // 16 - 1:
-			statistic.write_file(player1, episode)
-		elif episode == episodes // 8 - 1:
-			statistic.write_file(player1, episode)
-		elif episode == episodes // 4 - 1:
-			statistic.write_file(player1, episode)
-		elif episode == episodes // 2 - 1:
-			statistic.write_file(player1, episode)
-		elif episode == episodes - 1:
-			statistic.write_file(player1, episode)
-	print("Training finished")
+	# Start playing episodes of game with learning rate, learning rate decay and writing statistics
+	TicTacToeGame(0.3, 0.1, 200, True)
