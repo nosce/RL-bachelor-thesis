@@ -1,6 +1,7 @@
 import pygame
 import numpy as np
 import random
+import json
 
 random.seed(42)  # for reproducibility
 # GUI configuration
@@ -262,12 +263,11 @@ class QAgent(Player):
 			self.learn_qvalue(self.last_state, self.last_action, self.reward, new_state)
 
 	def print_qtable(self):
-		# Return Q-table as string, e.g to store it in a file
-		table = sorted(self.qtable.items())
-		output = ""
-		for key, value in table:
-			output += "\n{} ## {}".format(key, value)
-		return output
+		# Return Q-table in json-format, e.g to store it in a file
+		json_table = {}
+		for key, value in self.qtable.items():
+			json_table[str(key)] = value
+		return json.dumps(json_table, indent=3, sort_keys=True)
 
 	def get_qvalue(self, state, action):
 		# Return Q-value for state-action pair if it exists, otherwise start with a Q-value of 0
@@ -317,7 +317,7 @@ class Statistics(object):
 		file.write("Entries in Q-Table: {}".format(len(player.qtable)))
 		file.write("\n" + self.print_winner())
 		file.write("\n" + self.print_average_reward())
-		file.write("\n******* Q-table of Player X after {} episodes *************".format(eps + 1))
+		file.write("\n******* Q-table of Player X after {} episodes *************\n".format(eps + 1))
 		file.write(player.print_qtable())
 		print("Stored results for episode {}".format(eps + 1))
 
@@ -325,4 +325,4 @@ class Statistics(object):
 # Start application
 if __name__ == '__main__':
 	# Start playing episodes of game with learning rate, learning rate decay and writing statistics
-	TicTacToeGame(0.3, 0.1, 200, True)
+	TicTacToeGame(0.3, 0.1, 10000, True)
