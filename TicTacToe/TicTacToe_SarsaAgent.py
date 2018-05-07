@@ -29,8 +29,8 @@ class TicTacToeGame(object):
 		# Agents and learning variables
 		self.learning_rate = learning_rate
 		self.learning_rate_decay = learning_rate_decay
-		self.player1 = QAgent('X', alpha=self.learning_rate, gamma=0.9, epsilon=0.2)
-		self.player2 = QAgent('O', alpha=self.learning_rate, gamma=0.9, epsilon=0.2)
+		self.player1 = SarsaAgent('X', alpha=self.learning_rate, gamma=0.9, epsilon=0.2)
+		self.player2 = SarsaAgent('O', alpha=self.learning_rate, gamma=0.9, epsilon=0.2)
 		self.start_playing_episodes(episodes)
 
 	def start_playing_episodes(self, episodes):
@@ -70,30 +70,27 @@ class TicTacToeGame(object):
 		# Game loop
 		while game_board.game_running:
 			fps_clock.tick(fps)
-			# Give rewards when game is won / lost
+			# Give rewards when game is won / lost / drawn
 			if game_board.gameover():
 				for player_id, player in players.items():
-					if player_id == game_board.winner:
+					if game_board.winner == 0:
+						reward = GAME_DRAW
+					elif player_id == game_board.winner:
 						reward = GAME_WON
 					else:
 						reward = GAME_LOST
 					player.store_reward(reward)
 					state = game_board.get_board_state()
-					player.update_qtable(state)
-			# Give rewards when game is drawn
-			elif game_board.draw():
-				for player_id, player in players.items():
-					reward = GAME_DRAW
-					player.store_reward(reward)
-					state = game_board.get_board_state()
-					player.update_qtable(state)
+					current_player.select_action(state)
+					player.update_qtable()
 			# Moves of agent
 			else:
-				# Get current board state
+				# Get current board state and action
 				state = game_board.get_board_state()
-				current_player.update_qtable(state)
-				# Select action
 				action = current_player.select_action(state)
+				# Update Q-table
+				current_player.update_qtable()
+				# Get current reward
 				valid_move, reward = game_board.update_board(action, current_player)
 				current_player.store_reward(reward)
 				# Switch player
@@ -155,16 +152,10 @@ class Board(object):
 		elif neg_row_sum == -3 or neg_column_sum == -3 or diagonal_sum == -3 or antidiagonal_sum == -3:
 			self.winner = -1
 			self.game_running = False
-		return not self.game_running
-
-	def draw(self):
-		# Checks if all fields are marked but there is no winning constellation
-		if np.prod(self.board) == 0:
-			return False
-		else:
+		elif np.prod(self.board) != 0:
 			self.winner = 0
 			self.game_running = False
-			return True
+		return not self.game_running
 
 
 class Field(object):
@@ -190,13 +181,15 @@ class Player(object):
 		self.mark = mark
 
 
-class QAgent(Player):
+class SarsaAgent(Player):
 	def __init__(self, mark, epsilon, alpha, gamma):
 		Player.__init__(self, mark)
 		self.epsilon = epsilon  # chance of exploration instead of exploitation
 		self.alpha = alpha  # learning rate
 		self.gamma = gamma  # discount factor for future rewards
 		self.qtable = {}  # Q-table for storing state-action-values
+		self.current_state = None
+		self.current_action = None
 		self.last_state = None
 		self.last_action = None
 		self.reward = None
@@ -204,6 +197,8 @@ class QAgent(Player):
 
 	def start_game(self):
 		# Reset memory of last states, action and rewards when new game starts
+		self.current_state = None
+		self.current_action = None
 		self.last_state = None
 		self.last_action = None
 		self.reward = None
@@ -215,7 +210,7 @@ class QAgent(Player):
 
 	@staticmethod
 	def possible_actions(state):
-		# Return all empty fields in the given fields which are available as actions
+		# Return all empty fields in the given state
 		actions = []
 		for row in range(3):
 			for col in range(3):
@@ -225,12 +220,16 @@ class QAgent(Player):
 
 	def select_action(self, board_state):
 		# Selects an action epsilon-greedily
-		# Store board state
-		self.last_state = board_state
+		# Store previous values
+		self.last_state = self.current_state
+		self.current_state = board_state
+		self.last_action = self.current_action
 		# Randomly choose a number between 0.0 and 1.0; if it is lower than epsilon, explore possible actions randomly
+		if len(self.possible_actions(board_state)) == 0:
+			return None
 		if random.uniform(0, 1) < self.epsilon:
 			actions = self.possible_actions(board_state)
-			self.last_action = random.choice(actions)
+			self.current_action = random.choice(actions)
 		else:
 			# Get the Q-values for all possible actions in the current state
 			all_qvalues = {}
@@ -249,25 +248,13 @@ class QAgent(Player):
 				move = random.choice(all_qvalues[max_qvalue])
 			else:
 				move = all_qvalues[max_qvalue][0]
-			self.last_action = move
-		return self.last_action
+			self.current_action = move
+		return self.current_action
 
 	def store_reward(self, reward):
 		# Remember the reward given and add it to total reward
 		self.reward = reward
 		self.total_reward += reward
-
-	def update_qtable(self, new_state):
-		# Recalculate Q-values if values are available (i.e. after one state-action-state transition)
-		if self.last_state and self.last_action and self.reward:
-			self.learn_qvalue(self.last_state, self.last_action, self.reward, new_state)
-
-	def print_qtable(self):
-		# Return Q-table in json-format, e.g to store it in a file
-		json_table = {}
-		for key, value in self.qtable.items():
-			json_table[str(key)] = value
-		return json.dumps(json_table, indent=3, sort_keys=True)
 
 	def get_qvalue(self, state, action):
 		# Return Q-value for state-action pair if it exists, otherwise start with a Q-value of 0
@@ -276,12 +263,20 @@ class QAgent(Player):
 			self.qtable[(state, action)] = 0
 		return self.qtable[(state, action)]
 
-	def learn_qvalue(self, state, action, reward, new_state):
-		# Update Q-values based on action-value-function Q(s,a)
-		current_value = self.get_qvalue(state, action)
-		possible_returns = [self.get_qvalue(new_state, a) for a in self.possible_actions(new_state)]
-		max_return = max(possible_returns) if possible_returns else 0
-		self.qtable[(state, action)] = current_value + self.alpha * (reward + self.gamma * max_return - current_value)
+	def update_qtable(self):
+		# Recalculate Q-values if values are available (i.e. after one state-action-state transition)
+		if self.last_state and self.last_action and self.reward:
+			current_value = self.get_qvalue(self.last_state, self.last_action)
+			next_return = self.get_qvalue(self.current_state, self.current_action)
+			self.qtable[(self.last_state, self.last_action)] = current_value + self.alpha * \
+															   (self.reward + self.gamma * next_return - current_value)
+
+	def print_qtable(self):
+		# Return Q-table in json-format, e.g to store it in a file
+		json_table = {}
+		for key, value in self.qtable.items():
+			json_table[str(key)] = value
+		return json.dumps(json_table, indent=3, sort_keys=True)
 
 
 class Statistics(object):
@@ -312,7 +307,7 @@ class Statistics(object):
 		return "Average reward of Player X = {} and of Player O = {}".format(np.mean(result_x), np.mean(result_o))
 
 	def write_file(self, player, eps):
-		filename = "trainingresults{}.txt".format(eps + 1)
+		filename = "sarsaresults{}.txt".format(eps + 1)
 		file = open(filename, "w+")
 		file.write("Entries in Q-Table: {}".format(len(player.qtable)))
 		file.write("\n" + self.print_winner())
@@ -325,4 +320,4 @@ class Statistics(object):
 # Start application
 if __name__ == '__main__':
 	# Start playing episodes of game with learning rate, learning rate decay and writing statistics
-	TicTacToeGame(0.3, 0.1, 10000, True)
+	TicTacToeGame(0.3, 0.1, 40000, True)
