@@ -2,6 +2,7 @@ import pygame
 import numpy as np
 import random
 import json
+import matplotlib.pyplot as plt
 
 random.seed(42)  # for reproducibility
 # GUI configuration
@@ -43,16 +44,9 @@ class TicTacToeGame(object):
 			self.player2.adjust_alpha(self.learning_rate / (1 + episode * self.learning_rate_decay))
 			# Write statistics
 			if self.write_statistics:
-				if episode == episodes // 16 - 1:
-					self.statistic.write_file(self.player1, episode)
-				elif episode == episodes // 8 - 1:
-					self.statistic.write_file(self.player1, episode)
-				elif episode == episodes // 4 - 1:
-					self.statistic.write_file(self.player1, episode)
-				elif episode == episodes // 2 - 1:
-					self.statistic.write_file(self.player1, episode)
-				elif episode == episodes - 1:
-					self.statistic.write_file(self.player1, episode)
+				self.statistic.write_file(self.player1, episodes)
+				self.statistic.write_qtable(self.player1, episodes)
+				self.statistic.draw_cumulative_reward()
 		print("Training finished")
 
 	@staticmethod
@@ -286,6 +280,10 @@ class Statistics(object):
 		self.win_x = 0
 		self.win_o = 0
 		self.draw = 0
+		self.cumulative_reward_x = 0
+		self.cumulative_reward_o = 0
+		self.cum_reward_list_x = []
+		self.cum_reward_list_o = []
 
 	def count_winner(self, player_id):
 		if player_id == 1:
@@ -301,20 +299,42 @@ class Statistics(object):
 	def store_rewards(self, eps, rew):
 		self.data[eps] = rew
 
-	def print_average_reward(self):
+	def calc_rewards(self):
 		eps, res = zip(*self.data.items())
 		result_x, result_o = zip(*res)
+		for item, x, o in zip(eps, result_x, result_o):
+			self.cumulative_reward_x += x
+			self.cum_reward_list_x.append(self.cumulative_reward_x)
+			self.cumulative_reward_o += o
+			self.cum_reward_list_o.append(self.cumulative_reward_o)
+		return eps, result_x, result_o
+
+	def print_reward_data(self):
+		eps, result_x, result_o = self.calc_rewards()
 		return "Average reward of Player X = {} and of Player O = {}".format(np.mean(result_x), np.mean(result_o))
 
+	def draw_cumulative_reward(self):
+		eps, result_x, result_o = self.calc_rewards()
+		plt.plot(eps, self.cum_reward_list_x, label='Player X', color='orange')
+		plt.plot(eps, self.cum_reward_list_o, label='Player O', color='blue')
+		plt.ylabel('Cumulative reward')
+		plt.xlabel('Episode')
+		plt.legend()
+		plt.show()
+
 	def write_file(self, player, eps):
-		filename = "sarsaresults{}.txt".format(eps + 1)
+		filename = "trainingresults{}.txt".format(eps)
 		file = open(filename, "w+")
-		file.write("Entries in Q-Table: {}".format(len(player.qtable)))
+		file.write("Number of entries in Q-Table: {}".format(len(player.qtable)))
 		file.write("\n" + self.print_winner())
-		file.write("\n" + self.print_average_reward())
-		file.write("\n******* Q-table of Player X after {} episodes *************\n".format(eps + 1))
-		file.write(player.print_qtable())
+		file.write("\n" + self.print_reward_data())
 		print("Stored results for episode {}".format(eps + 1))
+
+	def write_qtable(self, player, eps):
+		filename = "qtable{}.json".format(eps)
+		file = open(filename, "w+")
+		file.write(player.print_qtable())
+		print("Saved Q-table for player {}".format(player.mark))
 
 
 # Start application
