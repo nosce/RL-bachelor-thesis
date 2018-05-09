@@ -264,7 +264,7 @@ class SarsaAgent(Player):
 		# Return Q-value for state-action pair if it exists, otherwise start with a Q-value of 0
 		# in order to encourage exploration of new states
 		if (state, action) not in self.qtable:
-			self.qtable[(state, action)] = 0
+			self.qtable[(state, action)] = 0.1
 		return self.qtable[(state, action)]
 
 	def update_qtable(self):
