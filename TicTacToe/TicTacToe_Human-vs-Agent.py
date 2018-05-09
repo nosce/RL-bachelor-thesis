@@ -29,7 +29,7 @@ def play_game():
 		# Initialize board and players
 		player_x = Agent('X')
 		player_o = Player('O')
-		player_x.load_qtable('sarsa-table.json')
+		player_x.load_qtable('qtable.json')
 		game_board = Board()
 		players = {player_x.id: player_x.mark, player_o.id: player_o.mark}
 		current_player = player_x
