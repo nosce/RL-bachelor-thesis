@@ -3,6 +3,7 @@ import numpy as np
 import random
 import json
 import matplotlib.pyplot as plt
+from time import process_time, perf_counter
 
 random.seed(42)  # for reproducibility
 # GUI configuration
@@ -16,35 +17,45 @@ pygame.init()
 screen = pygame.display.set_mode(WINDOW)
 pygame.display.set_caption('Tic Tac Toe')
 # Rewards
-GAME_WON = 0
-GAME_LOST = -10
-GAME_DRAW = -5
-VALID_MOVE = -0.1
+GAME_WON = 1
+GAME_LOST = -1
+GAME_DRAW = 0
+VALID_MOVE = 0
 INVALID_MOVE = -100
 
 
 class TicTacToeGame(object):
-	def __init__(self, learning_rate=0.3, learning_rate_decay=0.1, episodes=100, write_statistics=False):
+	def __init__(self, learning_rate=0.5, epsilon=0.8, episodes=500, write_statistics=True):
 		self.statistic = Statistics()
 		self.write_statistics = write_statistics
 		# Agents and learning variables
 		self.learning_rate = learning_rate
-		self.learning_rate_decay = learning_rate_decay
-		self.player1 = QAgent('X', alpha=self.learning_rate, gamma=0.9, epsilon=0.2)
-		self.player2 = QAgent('O', alpha=self.learning_rate, gamma=0.9, epsilon=0.2)
+		self.learning_rate_decay = np.linspace(0, learning_rate, num=episodes)
+		self.epsilon = epsilon
+		self.epsilon_decay = np.linspace(0, epsilon - 0.1, num=episodes)
+		self.player1 = QAgent('X', alpha=self.learning_rate, gamma=0.9, epsilon=self.epsilon)
+		self.player2 = QAgent('O', alpha=self.learning_rate, gamma=0.9, epsilon=self.epsilon)
 		self.start_playing_episodes(episodes)
 
 	def start_playing_episodes(self, episodes):
+		# Start measuring time
+		clock_start = perf_counter()
+		cpu_start = process_time()
 		# Start playing episodes
 		for episode in range(episodes):
 			result, winner = self.play_game(self.player1, self.player2)
-			self.statistic.store_rewards(episode, result)
-			self.statistic.count_winner(winner)
-			self.player1.adjust_alpha(self.learning_rate / (1 + episode * self.learning_rate_decay))
-			self.player2.adjust_alpha(self.learning_rate / (1 + episode * self.learning_rate_decay))
+			self.statistic.store_statistics(episode, result, winner)
+			new_alpha = self.learning_rate - self.learning_rate_decay[episode]
+			new_epsilon = self.epsilon - self.epsilon_decay[episode]
+			self.player1.adjust_learning_values(new_alpha, new_epsilon)
+			self.player2.adjust_learning_values(new_alpha, new_epsilon)
 		# Write statistics
+		cpu_end = process_time()
+		clock_end = perf_counter()
+		cpu_time = cpu_end - cpu_start
+		clock_time = clock_end - clock_start
 		if self.write_statistics:
-			self.statistic.write_file(self.player1, episodes)
+			self.statistic.write_statistic_file(self.player1, episodes, clock_time, cpu_time)
 			self.statistic.write_qtable(self.player1, episodes)
 			self.statistic.draw_cumulative_reward()
 		print("Training finished")
@@ -57,13 +68,12 @@ class TicTacToeGame(object):
 		player_x.start_game()
 		player_o.start_game()
 		current_player = player_x
-		final_result = []
-		# Timer: lower values allow to observe the game, higher values will speed up the game
-		fps = 100
+		final_result = {}
 		fps_clock = pygame.time.Clock()
 		# Game loop
 		while game_board.game_running:
-			fps_clock.tick(fps)
+			# Timer; when a framerate is provided as argument, the game can be slowed down
+			fps_clock.tick()
 			# Give rewards when game is won / lost / drawn
 			if game_board.gameover():
 				for player_id, player in players.items():
@@ -91,7 +101,7 @@ class TicTacToeGame(object):
 			pygame.display.flip()
 		# At the end of game return the players' rewards
 		for player_id, player in players.items():
-			final_result.append(player.total_reward)
+			final_result[player.mark] = player.total_reward
 		return final_result, game_board.winner
 
 
@@ -183,7 +193,7 @@ class QAgent(Player):
 		self.last_state = None
 		self.last_action = None
 		self.reward = None
-		self.total_reward = 0
+		self.total_reward = 0  # Reward accumulated during the game
 
 	def start_game(self):
 		# Reset memory of last states, action and rewards when new game starts
@@ -192,9 +202,10 @@ class QAgent(Player):
 		self.reward = None
 		self.total_reward = 0
 
-	def adjust_alpha(self, new_alpha):
-		# Adjust learning rate over course of episodes
+	def adjust_learning_values(self, new_alpha, new_epsilon):
+		# Adjust learning rate and exploration over course of episodes
 		self.alpha = new_alpha
+		self.epsilon = new_epsilon
 
 	@staticmethod
 	def possible_actions(state):
@@ -210,8 +221,8 @@ class QAgent(Player):
 		# Selects an action epsilon-greedily
 		# Store board state
 		self.last_state = board_state
-		# Randomly choose a number between 0.0 and 1.0; if it is lower than epsilon, explore possible actions randomly
-		if random.uniform(0, 1) < self.epsilon:
+		# Randomly choose a number between 0 and 1; if it is lower than epsilon, explore possible actions randomly
+		if np.random.random() < self.epsilon:
 			actions = self.possible_actions(board_state)
 			self.last_action = random.choice(actions)
 		else:
@@ -253,10 +264,10 @@ class QAgent(Player):
 		return json.dumps(json_table, indent=3, sort_keys=True)
 
 	def get_qvalue(self, state, action):
-		# Return Q-value for state-action pair if it exists, otherwise start with a Q-value of 0
-		# in order to encourage exploration of new states
+		# Return Q-value for state-action pair if it exists, otherwise start with a Q-value of 0.1
+		# to encourage exploration of new states
 		if (state, action) not in self.qtable:
-			self.qtable[(state, action)] = 0
+			self.qtable[(state, action)] = 0.1
 		return self.qtable[(state, action)]
 
 	def learn_qvalue(self, state, action, reward, new_state):
@@ -270,14 +281,22 @@ class QAgent(Player):
 class Statistics(object):
 	# Bundles functions for getting learning statistics
 	def __init__(self):
-		self.data = {}
+		self.episodes = []
 		self.win_x = 0
 		self.win_o = 0
 		self.draw = 0
+		self.rewards_x = []
+		self.rewards_o = []
 		self.cumulative_reward_x = 0
 		self.cumulative_reward_o = 0
 		self.cum_reward_list_x = []
 		self.cum_reward_list_o = []
+
+	def store_statistics(self, episode, result, winner):
+		self.count_winner(winner)
+		self.episodes.append(episode)
+		self.rewards_x.append(result["X"])
+		self.rewards_o.append(result["O"])
 
 	def count_winner(self, player_id):
 		if player_id == 1:
@@ -287,42 +306,32 @@ class Statistics(object):
 		elif player_id == 0:
 			self.draw += 1
 
-	def print_winner(self):
-		return "Player X won: {} \nPlayer O won: {}\nDraw: {}".format(self.win_x, self.win_o, self.draw)
-
-	def store_rewards(self, eps, rew):
-		self.data[eps] = rew
-
 	def calc_rewards(self):
-		eps, res = zip(*self.data.items())
-		result_x, result_o = zip(*res)
-		for item, x, o in zip(eps, result_x, result_o):
+		for x, o in zip(self.rewards_x, self.rewards_o):
 			self.cumulative_reward_x += x
 			self.cum_reward_list_x.append(self.cumulative_reward_x)
 			self.cumulative_reward_o += o
 			self.cum_reward_list_o.append(self.cumulative_reward_o)
-		return eps, result_x, result_o
-
-	def print_reward_data(self):
-		eps, result_x, result_o = self.calc_rewards()
-		return "Average reward of Player X = {} and of Player O = {}".format(np.mean(result_x), np.mean(result_o))
 
 	def draw_cumulative_reward(self):
-		eps, result_x, result_o = self.calc_rewards()
-		plt.plot(eps, self.cum_reward_list_x, label='Player X', color='orange')
-		plt.plot(eps, self.cum_reward_list_o, label='Player O', color='blue')
+		self.calc_rewards()
+		plt.plot(self.episodes, self.cum_reward_list_x, label='Player X', color='orange')
+		plt.plot(self.episodes, self.cum_reward_list_o, label='Player O', color='blue')
 		plt.ylabel('Cumulative reward')
 		plt.xlabel('Episode')
 		plt.legend()
 		plt.show()
 
-	def write_file(self, player, eps):
-		filename = "trainingresults{}.txt".format(eps)
+	def write_statistic_file(self, player, eps, clock_time, cpu_time):
+		filename = "trainingresults_Q_{}.txt".format(eps)
 		file = open(filename, "w+")
-		file.write("Number of entries in Q-Table: {}".format(len(player.qtable)))
-		file.write("\n" + self.print_winner())
-		file.write("\n" + self.print_reward_data())
-		print("Stored results for episode {}".format(eps + 1))
+		file.write("Elapsed time: {} sec".format(clock_time))
+		file.write("\nCPU processing time: {} sec".format(cpu_time))
+		file.write("\nNumber of entries in Q-Table of player {}: {}".format(player.mark, len(player.qtable)))
+		file.write("\nPlayer X won: {} \nPlayer O won: {}\nDraw: {}".format(self.win_x, self.win_o, self.draw))
+		file.write("\nAverage reward of Player X: {}".format(np.mean(self.rewards_x)))
+		file.write("\nAverage reward of Player O: {}".format(np.mean(self.rewards_o)))
+		print("Stored results after {} episodes".format(eps))
 
 	def write_qtable(self, player, eps):
 		filename = "qtable{}.json".format(eps)
@@ -333,5 +342,5 @@ class Statistics(object):
 
 # Start application
 if __name__ == '__main__':
-	# Start playing episodes of game with learning rate, learning rate decay and writing statistics
-	TicTacToeGame(0.3, 0.1, 10000, True)
+	# Start playing episodes of game with learning and exploration rate and writing statistics
+	TicTacToeGame(0.5, 0.8, 5000, True)
