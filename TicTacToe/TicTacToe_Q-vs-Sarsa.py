@@ -1,11 +1,10 @@
 import pygame
 import numpy as np
-import random
 import json
 import matplotlib.pyplot as plt
 from time import process_time, perf_counter
 
-random.seed(42)  # for reproducibility
+np.random.seed(42)  # for reproducibility
 # GUI configuration
 GRAY = (245, 245, 245)
 BLACK = (41, 40, 48)
@@ -55,8 +54,8 @@ class TicTacToeGame(object):
 		cpu_time = cpu_end - cpu_start
 		clock_time = clock_end - clock_start
 		if self.write_statistics:
-			self.statistic.write_statistic_file(self.player1, self.player2, episodes, clock_time, cpu_time)
-			self.statistic.write_qtable(self.player1, episodes)
+			self.statistic.write_statistic_file(self.player1, self.player2, episode, clock_time, cpu_time)
+			self.statistic.write_qtable(self.player1, episode)
 			self.statistic.draw_cumulative_reward()
 		print("Training finished")
 
@@ -101,7 +100,7 @@ class TicTacToeGame(object):
 			pygame.display.flip()
 		# At the end of game return the players' rewards
 		for player_id, player in players.items():
-			final_result[player.mark] = player.total_reward
+			final_result[player.mark] = {"reward": player.total_reward, "moves": player.moves}
 		return final_result, game_board.winner
 
 
@@ -194,6 +193,7 @@ class Agent(Player):
 		self.last_state = None
 		self.last_action = None
 		self.reward = None
+		self.moves = 0
 
 	def adjust_learning_values(self, new_alpha, new_epsilon):
 		# Adjust learning rate and exploration over course of episodes
@@ -234,6 +234,7 @@ class QAgent(Agent):
 		self.last_action = None
 		self.reward = None
 		self.total_reward = 0
+		self.moves = 0
 
 	def select_action(self, board_state):
 		# Selects an action epsilon-greedily
@@ -242,7 +243,7 @@ class QAgent(Agent):
 		# Randomly choose a number between 0 and 1; if it is lower than epsilon, explore possible actions randomly
 		if np.random.random() < self.epsilon:
 			actions = self.possible_actions(board_state)
-			self.last_action = random.choice(actions)
+			self.last_action = actions[np.random.choice(len(actions))]
 		else:
 			# Get the Q-values for all possible actions in the current state
 			all_qvalues = {}
@@ -258,10 +259,11 @@ class QAgent(Agent):
 			best_actions = len(all_qvalues[max_qvalue])
 			# If there is more than one best action, choose randomly
 			if best_actions > 1:
-				move = random.choice(all_qvalues[max_qvalue])
+				move = all_qvalues[max_qvalue][np.random.choice(best_actions)]
 			else:
 				move = all_qvalues[max_qvalue][0]
 			self.last_action = move
+		self.moves += 1
 		return self.last_action
 
 	def update_qtable(self, new_state):
@@ -297,6 +299,7 @@ class SarsaAgent(Agent):
 		self.last_action = None
 		self.reward = None
 		self.total_reward = 0
+		self.moves = 0
 
 	def select_action(self, board_state):
 		# Selects an action epsilon-greedily
@@ -307,9 +310,9 @@ class SarsaAgent(Agent):
 		# Randomly choose a number between 0.0 and 1.0; if it is lower than epsilon, explore possible actions randomly
 		if len(self.possible_actions(board_state)) == 0:
 			return None
-		if random.uniform(0, 1) < self.epsilon:
+		if np.random.random() < self.epsilon:
 			actions = self.possible_actions(board_state)
-			self.current_action = random.choice(actions)
+			self.current_action = actions[np.random.choice(len(actions))]
 		else:
 			# Get the Q-values for all possible actions in the current state
 			all_qvalues = {}
@@ -325,10 +328,11 @@ class SarsaAgent(Agent):
 			best_actions = len(all_qvalues[max_qvalue])
 			# If there is more than one best action, choose randomly
 			if best_actions > 1:
-				move = random.choice(all_qvalues[max_qvalue])
+				move = all_qvalues[max_qvalue][np.random.choice(best_actions)]
 			else:
 				move = all_qvalues[max_qvalue][0]
 			self.current_action = move
+		self.moves += 1
 		return self.current_action
 
 	def update_qtable(self, new_state):
@@ -356,6 +360,8 @@ class Statistics(object):
 		self.draw = 0
 		self.rewards_x = []
 		self.rewards_o = []
+		self.moves_x = []
+		self.moves_o = []
 		self.cumulative_reward_x = 0
 		self.cumulative_reward_o = 0
 		self.cum_reward_list_x = []
@@ -364,8 +370,14 @@ class Statistics(object):
 	def store_statistics(self, episode, result, winner):
 		self.count_winner(winner)
 		self.episodes.append(episode)
-		self.rewards_x.append(result["X"])
-		self.rewards_o.append(result["O"])
+		self.rewards_x.append(result["X"]["reward"])
+		self.rewards_o.append(result["O"]["reward"])
+		self.moves_x.append(result["X"]["moves"])
+		self.moves_o.append(result["O"]["moves"])
+		self.cumulative_reward_x += result["X"]["reward"]
+		self.cum_reward_list_x.append(self.cumulative_reward_x)
+		self.cumulative_reward_o += result["O"]["reward"]
+		self.cum_reward_list_o.append(self.cumulative_reward_o)
 
 	def count_winner(self, player_id):
 		if player_id == 1:
@@ -375,15 +387,7 @@ class Statistics(object):
 		elif player_id == 0:
 			self.draw += 1
 
-	def calc_rewards(self):
-		for x, o in zip(self.rewards_x, self.rewards_o):
-			self.cumulative_reward_x += x
-			self.cum_reward_list_x.append(self.cumulative_reward_x)
-			self.cumulative_reward_o += o
-			self.cum_reward_list_o.append(self.cumulative_reward_o)
-
 	def draw_cumulative_reward(self):
-		self.calc_rewards()
 		plt.plot(self.episodes, self.cum_reward_list_x, label='Player X', color='orange')
 		plt.plot(self.episodes, self.cum_reward_list_o, label='Player O', color='blue')
 		plt.ylabel('Cumulative reward')
@@ -401,11 +405,13 @@ class Statistics(object):
 		file.write("\nNumber of entries in Q-Table of player X: {}".format(len(player_x.qtable)))
 		file.write("\nPlayer X won: {}".format(self.win_x))
 		file.write("\nAverage reward of Player X: {}".format(np.mean(self.rewards_x)))
+		file.write("\nAverage number of moves of Player X: {}".format(np.mean(self.moves_x)))
 		file.write("\n" + ("*" * 40))
 		file.write("\nPlayer O trained with {}".format(player_o.method))
 		file.write("\nNumber of entries in Q-Table of player O: {}".format(len(player_o.qtable)))
 		file.write("\nPlayer O won: {}".format(self.win_o, self.draw))
 		file.write("\nAverage reward of Player O: {}".format(np.mean(self.rewards_o)))
+		file.write("\nAverage number of moves of Player O: {}".format(np.mean(self.moves_o)))
 		file.write("\nDraw: {}".format(self.win_o, self.draw))
 		print("Stored results after {} episodes".format(eps))
 
@@ -420,4 +426,4 @@ class Statistics(object):
 # Start application
 if __name__ == '__main__':
 	# Start playing episodes of game with learning and exploration rate and writing statistics
-	TicTacToeGame(0.5, 0.8, 5000, True)
+	TicTacToeGame(0.5, 0.8, 160000, True)
