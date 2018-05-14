@@ -54,8 +54,8 @@ class TicTacToeGame(object):
 		cpu_time = cpu_end - cpu_start
 		clock_time = clock_end - clock_start
 		if self.write_statistics:
-			self.statistic.write_statistic_file(self.player1, episode, clock_time, cpu_time)
-			self.statistic.write_qtable(self.player1, episode)
+			self.statistic.write_statistic_file(self.player1, episodes, clock_time, cpu_time)
+			self.statistic.write_qtable(self.player1, episodes)
 			self.statistic.draw_cumulative_reward()
 		print("Training finished")
 
@@ -283,41 +283,35 @@ class Statistics(object):
 	# Bundles functions for getting learning statistics
 	def __init__(self):
 		self.episodes = []
-		self.win_x = 0
-		self.win_o = 0
-		self.draw = 0
-		self.rewards_x = []
-		self.rewards_o = []
-		self.moves_x = []
-		self.moves_o = []
-		self.cumulative_reward_x = 0
-		self.cumulative_reward_o = 0
-		self.cum_reward_list_x = []
-		self.cum_reward_list_o = []
+		self.wins = {"X": 0, "O": 0, "D": 0}
+		self.rewards = {"X": [], "O": []}
+		self.moves = {"X": [], "O": []}
+		self.cumulative_reward = {"X": 0, "O": 0}
+		self.cum_reward_list = {"X": [], "O": []}
 
 	def store_statistics(self, episode, result, winner):
 		self.count_winner(winner)
 		self.episodes.append(episode)
-		self.rewards_x.append(result["X"]["reward"])
-		self.rewards_o.append(result["O"]["reward"])
-		self.moves_x.append(result["X"]["moves"])
-		self.moves_o.append(result["O"]["moves"])
-		self.cumulative_reward_x += result["X"]["reward"]
-		self.cum_reward_list_x.append(self.cumulative_reward_x)
-		self.cumulative_reward_o += result["O"]["reward"]
-		self.cum_reward_list_o.append(self.cumulative_reward_o)
+		self.rewards["X"].append(result["X"]["reward"])
+		self.rewards["O"].append(result["O"]["reward"])
+		self.moves["X"].append(result["X"]["moves"])
+		self.moves["O"].append(result["O"]["moves"])
+		self.cumulative_reward["X"] += result["X"]["reward"]
+		self.cum_reward_list["X"].append(self.cumulative_reward["X"])
+		self.cumulative_reward["O"] += result["O"]["reward"]
+		self.cum_reward_list["O"].append(self.cumulative_reward["O"])
 
 	def count_winner(self, player_id):
 		if player_id == 1:
-			self.win_x += 1
+			self.wins["X"] += 1
 		elif player_id == -1:
-			self.win_o += 1
+			self.wins["O"] += 1
 		elif player_id == 0:
-			self.draw += 1
+			self.wins["D"] += 1
 
 	def draw_cumulative_reward(self):
-		plt.plot(self.episodes, self.cum_reward_list_x, label='Player X', color='orange')
-		plt.plot(self.episodes, self.cum_reward_list_o, label='Player O', color='blue')
+		plt.plot(self.episodes, self.cum_reward_list["X"], label='Player X', color='orange')
+		plt.plot(self.episodes, self.cum_reward_list["O"], label='Player O', color='blue')
 		plt.ylabel('Cumulative reward')
 		plt.xlabel('Episode')
 		plt.legend()
@@ -329,14 +323,16 @@ class Statistics(object):
 		file.write("Elapsed time: {} sec".format(clock_time))
 		file.write("\nCPU processing time: {} sec".format(cpu_time))
 		file.write("\nNumber of entries in Q-Table of player {}: {}".format(player.mark, len(player.qtable)))
-		file.write("\nPlayer X won: {} \nPlayer O won: {}\nDraw: {}".format(self.win_x, self.win_o, self.draw))
-		file.write("\nAverage reward of Player X: {}".format(np.mean(self.rewards_x)))
-		file.write("\nAverage reward of Player O: {}".format(np.mean(self.rewards_o)))
-		file.write("\nAverage number of moves of Player X: {}".format(np.mean(self.moves_x)))
-		file.write("\nAverage number of moves of Player O: {}".format(np.mean(self.moves_o)))
+		file.write(
+			"\nPlayer X won: {} \nPlayer O won: {}\nDraw: {}".format(self.wins["X"], self.wins["O"], self.wins["D"]))
+		file.write("\nAverage reward of Player X: {}".format(np.mean(self.rewards["X"])))
+		file.write("\nAverage reward of Player O: {}".format(np.mean(self.rewards["O"])))
+		file.write("\nAverage number of moves of Player X: {}".format(np.mean(self.moves["X"])))
+		file.write("\nAverage number of moves of Player O: {}".format(np.mean(self.moves["O"])))
 		print("Stored results after {} episodes".format(eps))
 
-	def write_qtable(self, player, eps):
+	@staticmethod
+	def write_qtable(player, eps):
 		filename = "qtable{}.json".format(eps)
 		file = open(filename, "w+")
 		file.write(player.print_qtable())
@@ -346,4 +342,4 @@ class Statistics(object):
 # Start application
 if __name__ == '__main__':
 	# Start playing episodes of game with learning and exploration rate and writing statistics
-	TicTacToeGame(0.5, 0.8, 10000, True)
+	TicTacToeGame(0.5, 0.8, 160000, True)

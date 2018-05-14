@@ -54,8 +54,8 @@ class TicTacToeGame(object):
 		cpu_time = cpu_end - cpu_start
 		clock_time = clock_end - clock_start
 		if self.write_statistics:
-			self.statistic.write_statistic_file(self.player1, self.player2, episode, clock_time, cpu_time)
-			self.statistic.write_qtable(self.player1, episode)
+			self.statistic.write_statistic_file(self.player1, self.player2, episodes, clock_time, cpu_time)
+			self.statistic.write_qtable(self.player1, episodes)
 			self.statistic.draw_cumulative_reward()
 		print("Training finished")
 
@@ -355,41 +355,35 @@ class Statistics(object):
 	# Bundles functions for getting learning statistics
 	def __init__(self):
 		self.episodes = []
-		self.win_x = 0
-		self.win_o = 0
-		self.draw = 0
-		self.rewards_x = []
-		self.rewards_o = []
-		self.moves_x = []
-		self.moves_o = []
-		self.cumulative_reward_x = 0
-		self.cumulative_reward_o = 0
-		self.cum_reward_list_x = []
-		self.cum_reward_list_o = []
+		self.wins = {"X": 0, "O": 0, "D": 0}
+		self.rewards = {"X": [], "O": []}
+		self.moves = {"X": [], "O": []}
+		self.cumulative_reward = {"X": 0, "O": 0}
+		self.cum_reward_list = {"X": [], "O": []}
 
 	def store_statistics(self, episode, result, winner):
 		self.count_winner(winner)
 		self.episodes.append(episode)
-		self.rewards_x.append(result["X"]["reward"])
-		self.rewards_o.append(result["O"]["reward"])
-		self.moves_x.append(result["X"]["moves"])
-		self.moves_o.append(result["O"]["moves"])
-		self.cumulative_reward_x += result["X"]["reward"]
-		self.cum_reward_list_x.append(self.cumulative_reward_x)
-		self.cumulative_reward_o += result["O"]["reward"]
-		self.cum_reward_list_o.append(self.cumulative_reward_o)
+		self.rewards["X"].append(result["X"]["reward"])
+		self.rewards["O"].append(result["O"]["reward"])
+		self.moves["X"].append(result["X"]["moves"])
+		self.moves["O"].append(result["O"]["moves"])
+		self.cumulative_reward["X"] += result["X"]["reward"]
+		self.cum_reward_list["X"].append(self.cumulative_reward["X"])
+		self.cumulative_reward["O"] += result["O"]["reward"]
+		self.cum_reward_list["O"].append(self.cumulative_reward["O"])
 
 	def count_winner(self, player_id):
 		if player_id == 1:
-			self.win_x += 1
+			self.wins["X"] += 1
 		elif player_id == -1:
-			self.win_o += 1
+			self.wins["O"] += 1
 		elif player_id == 0:
-			self.draw += 1
+			self.wins["D"] += 1
 
 	def draw_cumulative_reward(self):
-		plt.plot(self.episodes, self.cum_reward_list_x, label='Player X', color='orange')
-		plt.plot(self.episodes, self.cum_reward_list_o, label='Player O', color='blue')
+		plt.plot(self.episodes, self.cum_reward_list["X"], label='Player X', color='orange')
+		plt.plot(self.episodes, self.cum_reward_list["O"], label='Player O', color='blue')
 		plt.ylabel('Cumulative reward')
 		plt.xlabel('Episode')
 		plt.legend()
@@ -403,21 +397,21 @@ class Statistics(object):
 		file.write("\n" + ("*" * 40))
 		file.write("\nPlayer X trained with {}".format(player_x.method))
 		file.write("\nNumber of entries in Q-Table of player X: {}".format(len(player_x.qtable)))
-		file.write("\nPlayer X won: {}".format(self.win_x))
-		file.write("\nAverage reward of Player X: {}".format(np.mean(self.rewards_x)))
-		file.write("\nAverage number of moves of Player X: {}".format(np.mean(self.moves_x)))
+		file.write("\nPlayer X won: {}".format(self.wins["X"]))
+		file.write("\nAverage reward of Player X: {}".format(np.mean(self.rewards["X"])))
+		file.write("\nAverage number of moves of Player X: {}".format(np.mean(self.moves["X"])))
 		file.write("\n" + ("*" * 40))
 		file.write("\nPlayer O trained with {}".format(player_o.method))
 		file.write("\nNumber of entries in Q-Table of player O: {}".format(len(player_o.qtable)))
-		file.write("\nPlayer O won: {}".format(self.win_o, self.draw))
-		file.write("\nAverage reward of Player O: {}".format(np.mean(self.rewards_o)))
-		file.write("\nAverage number of moves of Player O: {}".format(np.mean(self.moves_o)))
-		file.write("\nDraw: {}".format(self.win_o, self.draw))
+		file.write("\nPlayer O won: {}".format(self.wins["O"]))
+		file.write("\nAverage reward of Player O: {}".format(np.mean(self.rewards["O"])))
+		file.write("\nAverage number of moves of Player O: {}".format(np.mean(self.moves["O"])))
+		file.write("\nDraw: {}".format(self.wins["D"]))
 		print("Stored results after {} episodes".format(eps))
 
 	@staticmethod
 	def write_qtable(player, eps):
-		filename = "qtable{}{}.json".format(eps, player.method)
+		filename = "qtable{}_{}.json".format(eps, player.method)
 		file = open(filename, "w+")
 		file.write(player.print_qtable())
 		print("Saved Q-table for player {}".format(player.mark))
