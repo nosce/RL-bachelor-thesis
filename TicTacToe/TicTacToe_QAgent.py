@@ -255,7 +255,7 @@ class QAgent(Player):
 
 	def update_qtable(self, new_state):
 		# Recalculate Q-values if values are available (i.e. after one state-action-state transition)
-		if self.last_state and self.last_action and self.reward:
+		if self.last_state and self.last_action and not (self.reward is None):
 			self.learn_qvalue(self.last_state, self.last_action, self.reward, new_state)
 
 	def print_qtable(self):
@@ -326,7 +326,9 @@ class Statistics(object):
 		file.write(
 			"\nPlayer X won: {} \nPlayer O won: {}\nDraw: {}".format(self.wins["X"], self.wins["O"], self.wins["D"]))
 		file.write("\nAverage reward of Player X: {}".format(np.mean(self.rewards["X"])))
+		file.write("\nTotal reward of Player X after {} games: {}".format(eps, self.cumulative_reward["X"]))
 		file.write("\nAverage reward of Player O: {}".format(np.mean(self.rewards["O"])))
+		file.write("\nTotal reward of Player O after {} games: {}".format(eps, self.cumulative_reward["O"]))
 		file.write("\nAverage number of moves of Player X: {}".format(np.mean(self.moves["X"])))
 		file.write("\nAverage number of moves of Player O: {}".format(np.mean(self.moves["O"])))
 		print("Stored results after {} episodes".format(eps))
@@ -342,4 +344,4 @@ class Statistics(object):
 # Start application
 if __name__ == '__main__':
 	# Start playing episodes of game with learning and exploration rate and writing statistics
-	TicTacToeGame(0.5, 0.8, 160000, True)
+	TicTacToeGame(0.5, 0.8, 80000, True)

@@ -269,7 +269,7 @@ class QAgent(Agent):
 	def update_qtable(self, new_state):
 		# Update Q-values based on action-value-function Q(s,a) if values are available
 		# (i.e. after one state-action-state transition)
-		if self.last_state and self.last_action and self.reward:
+		if self.last_state and self.last_action and not (self.reward is None):
 			current_value = self.get_qvalue(self.last_state, self.last_action)
 			possible_returns = [self.get_qvalue(new_state, a) for a in self.possible_actions(new_state)]
 			max_return = max(possible_returns) if possible_returns else 0
@@ -337,7 +337,7 @@ class SarsaAgent(Agent):
 
 	def update_qtable(self, new_state):
 		# Recalculate Q-values if values are available (i.e. after one state-action-state transition)
-		if self.last_state and self.last_action and self.reward:
+		if self.last_state and self.last_action and not (self.reward is None):
 			current_value = self.get_qvalue(self.last_state, self.last_action)
 			next_return = self.get_qvalue(self.current_state, self.current_action)
 			self.qtable[(self.last_state, self.last_action)] = current_value + self.alpha * \
@@ -399,12 +399,14 @@ class Statistics(object):
 		file.write("\nNumber of entries in Q-Table of player X: {}".format(len(player_x.qtable)))
 		file.write("\nPlayer X won: {}".format(self.wins["X"]))
 		file.write("\nAverage reward of Player X: {}".format(np.mean(self.rewards["X"])))
+		file.write("\nTotal reward of Player X after {} games: {}".format(eps, self.cumulative_reward["X"]))
 		file.write("\nAverage number of moves of Player X: {}".format(np.mean(self.moves["X"])))
 		file.write("\n" + ("*" * 40))
 		file.write("\nPlayer O trained with {}".format(player_o.method))
 		file.write("\nNumber of entries in Q-Table of player O: {}".format(len(player_o.qtable)))
 		file.write("\nPlayer O won: {}".format(self.wins["O"]))
 		file.write("\nAverage reward of Player O: {}".format(np.mean(self.rewards["O"])))
+		file.write("\nTotal reward of Player O after {} games: {}".format(eps, self.cumulative_reward["O"]))
 		file.write("\nAverage number of moves of Player O: {}".format(np.mean(self.moves["O"])))
 		file.write("\nDraw: {}".format(self.wins["D"]))
 		print("Stored results after {} episodes".format(eps))
