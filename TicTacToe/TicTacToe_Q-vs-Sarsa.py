@@ -75,6 +75,8 @@ class TicTacToeGame(object):
 			fps_clock.tick()
 			# Give rewards when game is won / lost / drawn
 			if game_board.gameover():
+				state = game_board.get_board_state()
+				current_player.select_action(state)
 				for player_id, player in players.items():
 					if game_board.winner == 0:
 						reward = GAME_DRAW
@@ -83,15 +85,17 @@ class TicTacToeGame(object):
 					else:
 						reward = GAME_LOST
 					player.store_reward(reward)
-					state = game_board.get_board_state()
 					player.update_qtable(state)
 			# Moves of agent
 			else:
 				# Get current board state
 				state = game_board.get_board_state()
-				current_player.update_qtable(state)
-				# Select action
-				action = current_player.select_action(state)
+				if isinstance(current_player, QAgent):
+					current_player.update_qtable(state)
+					action = current_player.select_action(state)
+				if isinstance(current_player, SarsaAgent):
+					action = current_player.select_action(state)
+					current_player.update_qtable(state)
 				valid_move, reward = game_board.update_board(action, current_player)
 				current_player.store_reward(reward)
 				# Switch player
@@ -241,6 +245,8 @@ class QAgent(Agent):
 		# Store board state
 		self.last_state = board_state
 		# Randomly choose a number between 0 and 1; if it is lower than epsilon, explore possible actions randomly
+		if len(self.possible_actions(board_state)) == 0:
+			return None
 		if np.random.random() < self.epsilon:
 			actions = self.possible_actions(board_state)
 			self.last_action = actions[np.random.choice(len(actions))]
@@ -422,4 +428,4 @@ class Statistics(object):
 # Start application
 if __name__ == '__main__':
 	# Start playing episodes of game with learning and exploration rate and writing statistics
-	TicTacToeGame(0.5, 0.8, 160000, True)
+	TicTacToeGame(0.5, 0.8, 80000, True)

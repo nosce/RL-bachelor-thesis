@@ -74,6 +74,8 @@ class TicTacToeGame(object):
 			fps_clock.tick()
 			# Give rewards when game is won / lost / drawn
 			if game_board.gameover():
+				state = game_board.get_board_state()
+				current_player.select_action(state)
 				for player_id, player in players.items():
 					if game_board.winner == 0:
 						reward = GAME_DRAW
@@ -82,8 +84,6 @@ class TicTacToeGame(object):
 					else:
 						reward = GAME_LOST
 					player.store_reward(reward)
-					state = game_board.get_board_state()
-					current_player.select_action(state)
 					player.update_qtable()
 			# Moves of agent
 			else:
@@ -350,4 +350,4 @@ class Statistics(object):
 # Start application
 if __name__ == '__main__':
 	# Start playing episodes of game with learning rate, learning rate decay and writing statistics
-	TicTacToeGame(0.5, 0.8, 160000, True)
+	TicTacToeGame(0.5, 0.8, 80000, True)
