@@ -31,7 +31,7 @@ class TicTacToeGame(object):
 		self.learning_rate = learning_rate
 		self.learning_rate_decay = np.linspace(0, learning_rate, num=episodes)
 		self.epsilon = epsilon
-		self.epsilon_decay = np.linspace(0, epsilon - 0.1, num=episodes)
+		self.epsilon_decay = np.linspace(0, epsilon, num=episodes)
 		self.player1 = QAgent('X', alpha=self.learning_rate, gamma=0.9, epsilon=self.epsilon)
 		self.player2 = QAgent('O', alpha=self.learning_rate, gamma=0.9, epsilon=self.epsilon)
 		self.start_playing_episodes(episodes)
@@ -344,4 +344,4 @@ class Statistics(object):
 # Start application
 if __name__ == '__main__':
 	# Start playing episodes of game with learning and exploration rate and writing statistics
-	TicTacToeGame(0.5, 0.8, 80000, True)
+	TicTacToeGame(0.5, 0.8, 20000, True)
