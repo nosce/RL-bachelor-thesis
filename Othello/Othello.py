@@ -3,7 +3,6 @@ import sys
 import numpy as np
 from pygame.locals import *
 
-np.random.seed(42)
 # GUI configuration
 WHITE = (255, 255, 255)
 BLACK = (41, 40, 48)
@@ -16,12 +15,6 @@ WINDOW = (620, 800)
 pygame.init()
 screen = pygame.display.set_mode(WINDOW)
 pygame.display.set_caption('Othello')
-# Rewards
-GAME_WON = 1
-GAME_LOST = -1
-GAME_DRAW = 0
-VALID_MOVE = 0
-INVALID_MOVE = -100
 
 
 class OthelloGame(object):
@@ -36,19 +29,21 @@ class OthelloGame(object):
 			# Set up screen with restart button
 			screen.fill(WHITE)
 			font = pygame.font.SysFont("Arial", 32)
-			restart = pygame.draw.rect(screen, WHITE, (100, 700, WINDOW[0] / 2, WINDOW[0] / 5))
-			screen.blit(font.render("Restart", True, BLACK), (275, 700))
+			restart = pygame.draw.rect(screen, WHITE, (100, 720, WINDOW[0] / 2, WINDOW[0] / 5))
+			screen.blit(font.render("Restart", True, BLACK), (275, 730))
 			# Initialize board
 			game_board = Board()
 			players = {player_b.id: player_b.colour, player_w.id: player_w.colour}
 			current_player = player_b
 			play_again = False
+			black = 2
+			white = 2
 			# Timer
-			FPS = 20
+			fps = 20
 			fps_clock = pygame.time.Clock()
 			# Game loop
-			while game_board.game_running:
-				fps_clock.tick(FPS)
+			while not play_again:
+				fps_clock.tick(fps)
 				# Check if game is still running
 				if play_again:
 					break
@@ -57,13 +52,14 @@ class OthelloGame(object):
 						message = font.render("No winner", True, RED)
 					else:
 						message = font.render("{} wins".format(players[game_board.winner]), True, RED)
-					screen.blit(message, (100, 640))
-
-				for event in pygame.event.get():
+					screen.blit(message, (260, 680))
+				else:
+					# Check whether there are possible moves
 					all_valid_moves = game_board.get_valid_moves(current_player)
-					# Switch player immediately if no valid move possible
 					if len(all_valid_moves) == 0:
 						current_player = player_w if current_player == player_b else player_b
+
+				for event in pygame.event.get():
 					# Wait for input
 					if event.type == QUIT or (event.type == KEYUP and event.key == K_ESCAPE):
 						pygame.quit()
@@ -75,22 +71,28 @@ class OthelloGame(object):
 						# Check for board input if the game is running
 						if not game_board.gameover():
 							move = game_board.get_clicked_field(mouse_x, mouse_y)
-							valid_move = game_board.update_board(move, current_player)
+							valid_move, black, white = game_board.update_board(move, current_player)
 							# Switch current player
 							if valid_move and not game_board.gameover():
 								current_player = player_w if current_player == player_b else player_b
 					# Redisplay
+					pygame.draw.rect(screen, WHITE, (75, 620, WINDOW[0], 35))
+					message = font.render("Black stones: {}  |  White stones: {}".format(black, white), True, DARKGRAY)
+					screen.blit(message, (75, 620))
 					pygame.display.flip()
 
 
 class Board(object):
-	# Represents the Tic Tac Toe board
+	# Represents the Othello board
 	def __init__(self):
 		self.board = np.zeros((8, 8), dtype=int)
 		self.fields = {}
 		self.winner = False
+		self.black = 2
+		self.white = 2
 		self.game_running = True
 		self.valid_moves = []
+		self.no_moves_possible = {}
 		self.draw_board()
 
 	def draw_board(self):
@@ -104,7 +106,7 @@ class Board(object):
 		# Initial stones
 		initial_fields = [[3, 3], [3, 4], [4, 3], [4, 4]]
 		for field_x, field_y in initial_fields:
-			player = 1 if field_x == field_y else -1
+			player = -1 if field_x == field_y else 1
 			self.board[field_x, field_y] = player
 			self.fields[field_x, field_y].draw_mark(player)
 
@@ -124,6 +126,8 @@ class Board(object):
 			if self.find_flanks(field, player.id, False):
 				self.valid_moves.append(field.tolist())
 		self.draw_valid_moves(self.valid_moves)
+		# Log whether there is a valid move for the player
+		self.no_moves_possible[player] = True if len(self.valid_moves) == 0 else False
 		return self.valid_moves
 
 	def draw_valid_moves(self, moves):
@@ -142,14 +146,17 @@ class Board(object):
 
 	def update_board(self, field_id, player):
 		# Updates the board when a field has been selected
-		valid_move = self.find_flanks(field_id, player.id, True)
+		valid_move = self.board[field_id] == 0 and self.find_flanks(field_id, player.id, True)
 		if field_id == (-1, -1):
 			pass
 		elif valid_move:
 			self.board[field_id] = player.id
 			field = self.fields[field_id]
 			field.draw_mark(player.id)
-		return valid_move
+		# Count stones on board
+		self.black = np.count_nonzero(self.board == 1)
+		self.white = np.count_nonzero(self.board == -1)
+		return valid_move, self.black, self.white
 
 	def find_flanks(self, move, player, make_move):
 		# Finds flanked stones
@@ -186,19 +193,20 @@ class Board(object):
 
 	@staticmethod
 	def field_on_board(x, y):
+		# Checks whether the given field is on the board
 		return 0 <= x <= 7 and 0 <= y <= 7
 
 	def gameover(self):
-		# TODO Game over condition: board full or both players no valid move
-		# if pos_row_sum == 3 or pos_column_sum == 3 or diagonal_sum == 3 or antidiagonal_sum == 3:
-		# 	self.winner = 1
-		# 	self.game_running = False
-		# elif neg_row_sum == -3 or neg_column_sum == -3 or diagonal_sum == -3 or antidiagonal_sum == -3:
-		# 	self.winner = -1
-		# 	self.game_running = False
-		# elif np.prod(self.board) != 0:
-		# 	self.winner = 0
-		# 	self.game_running = False
+		# Game over if no move possibilities left for both players
+		if len(self.no_moves_possible) != 0 and all(v is True for v in self.no_moves_possible.values()):
+			self.game_running = False
+			# Determine winner
+			if self.black > self.white:
+				self.winner = 1
+			elif self.black < self.white:
+				self.winner = -1
+			else:
+				self.winner = 0
 		return not self.game_running
 
 
@@ -210,9 +218,11 @@ class Field(object):
 		self.rect = pygame.draw.rect(screen, WHITE, (self.x, self.y, 65, 65))
 
 	def highlight(self):
+		# Highlights the field
 		self.rect = pygame.draw.rect(screen, GREEN, (self.x, self.y, 65, 65))
 
 	def reset(self):
+		# Clears any highlights from the field
 		self.rect = pygame.draw.rect(screen, WHITE, (self.x, self.y, 65, 65))
 
 	def is_clicked(self, mouse_x, mouse_y):
@@ -231,7 +241,7 @@ class Field(object):
 
 
 class Player(object):
-	# Represents the players X and O
+	# Represents the black and white players
 	def __init__(self, colour):
 		self.id = 1 if colour == 'black' else -1
 		self.colour = colour
@@ -239,5 +249,4 @@ class Player(object):
 
 # Start application
 if __name__ == '__main__':
-	# Start playing game
 	OthelloGame()
