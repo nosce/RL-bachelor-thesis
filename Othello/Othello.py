@@ -54,9 +54,12 @@ class OthelloGame(object):
 						message = font.render("{} wins".format(players[game_board.winner]), True, RED)
 					screen.blit(message, (260, 680))
 				else:
-					# Check whether there are possible moves
-					all_valid_moves = game_board.get_valid_moves(current_player)
-					if len(all_valid_moves) == 0:
+					# Check whether there are possible moves, else switch player
+					game_board.clear_highlights()
+					all_valid_moves = current_player.get_valid_moves(game_board)
+					if len(all_valid_moves) != 0:
+						game_board.draw_valid_moves(all_valid_moves)
+					else:
 						current_player = player_w if current_player == player_b else player_b
 
 				for event in pygame.event.get():
@@ -72,7 +75,7 @@ class OthelloGame(object):
 						if not game_board.gameover():
 							move = game_board.get_clicked_field(mouse_x, mouse_y)
 							valid_move, black, white = game_board.update_board(move, current_player)
-							# Switch current player
+							# Switch current player after a valid move
 							if valid_move and not game_board.gameover():
 								current_player = player_w if current_player == player_b else player_b
 					# Redisplay
@@ -87,12 +90,11 @@ class Board(object):
 	def __init__(self):
 		self.board = np.zeros((8, 8), dtype=int)
 		self.fields = {}
-		self.winner = False
+		self.no_moves_possible = {}
 		self.black = 2
 		self.white = 2
 		self.game_running = True
-		self.valid_moves = []
-		self.no_moves_possible = {}
+		self.winner = False
 		self.draw_board()
 
 	def draw_board(self):
@@ -118,31 +120,17 @@ class Board(object):
 		else:
 			return -1, -1
 
-	def get_valid_moves(self, player):
-		# Checks whether there are valid moves for the player
-		self.clear_valid_moves(self.valid_moves)
-		empty_fields = np.transpose(np.where(self.board == 0))
-		for field in empty_fields:
-			if self.find_flanks(field, player.id, False):
-				self.valid_moves.append(field.tolist())
-		self.draw_valid_moves(self.valid_moves)
-		# Log whether there is a valid move for the player
-		self.no_moves_possible[player] = True if len(self.valid_moves) == 0 else False
-		return self.valid_moves
-
 	def draw_valid_moves(self, moves):
 		# Highlights the fields where moves are possible
 		if moves:
 			for move_x, move_y in moves:
 				self.fields[move_x, move_y].highlight()
 
-	def clear_valid_moves(self, moves):
+	def clear_highlights(self):
 		# Resets the highlighted fields for possible moves
-		if moves:
-			for move_x, move_y in moves:
-				if self.board[move_x, move_y] == 0:
-					self.fields[move_x, move_y].reset()
-			self.valid_moves.clear()
+		empty_fields = np.transpose(np.where(self.board == 0))
+		for field_x, field_y in empty_fields:
+			self.fields[field_x, field_y].reset()
 
 	def update_board(self, field_id, player):
 		# Updates the board when a field has been selected
@@ -245,6 +233,19 @@ class Player(object):
 	def __init__(self, colour):
 		self.id = 1 if colour == 'black' else -1
 		self.colour = colour
+		self.valid_moves = []
+
+	def get_valid_moves(self, state):
+		# Checks whether there are valid moves for the player
+		self.valid_moves.clear()
+		empty_fields = np.transpose(np.where(state.board == 0))
+		for field in empty_fields:
+			if state.find_flanks(field, self.id, False):
+				self.valid_moves.append(field.tolist())
+		state.draw_valid_moves(self.valid_moves)
+		# Log whether there is a valid move for the player
+		state.no_moves_possible[self.id] = True if len(self.valid_moves) == 0 else False
+		return self.valid_moves
 
 
 # Start application
