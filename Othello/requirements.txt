@@ -1,0 +1,8 @@
+pygame
+random
+json
+numpy
+tensorflow
+keras
+collections
+time

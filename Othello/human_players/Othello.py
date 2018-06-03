@@ -19,12 +19,10 @@ pygame.display.set_caption('Othello')
 
 class OthelloGame(object):
 	def __init__(self):
-		self.player1 = Player('black')
-		self.player2 = Player('white')
-		self.play_game(self.player1, self.player2)
+		self.player_b = Player('black')
+		self.player_w = Player('white')
 
-	@staticmethod
-	def play_game(player_b, player_w):
+	def play_game(self):
 		while True:
 			# Set up screen with restart button
 			screen.fill(WHITE)
@@ -33,8 +31,8 @@ class OthelloGame(object):
 			screen.blit(font.render("Restart", True, BLACK), (275, 730))
 			# Initialize board
 			game_board = Board()
-			players = {player_b.id: player_b.colour, player_w.id: player_w.colour}
-			current_player = player_b
+			players = {self.player_b.id: self.player_b.colour, self.player_w.id: self.player_w.colour}
+			current_player = self.player_b
 			play_again = False
 			black = 2
 			white = 2
@@ -60,7 +58,7 @@ class OthelloGame(object):
 					if len(all_valid_moves) != 0:
 						game_board.draw_valid_moves(all_valid_moves)
 					else:
-						current_player = player_w if current_player == player_b else player_b
+						current_player = self.player_w if current_player == self.player_b else self.player_b
 
 				for event in pygame.event.get():
 					# Wait for input
@@ -77,7 +75,7 @@ class OthelloGame(object):
 							valid_move, black, white = game_board.update_board(move, current_player)
 							# Switch current player after a valid move
 							if valid_move and not game_board.gameover():
-								current_player = player_w if current_player == player_b else player_b
+								current_player = self.player_w if current_player == self.player_b else self.player_b
 					# Redisplay
 					pygame.draw.rect(screen, WHITE, (75, 620, WINDOW[0], 35))
 					message = font.render("Black stones: {}  |  White stones: {}".format(black, white), True, DARKGRAY)
@@ -199,26 +197,43 @@ class Board(object):
 
 
 class Field(object):
-	# Represents a field on the board
+	"""
+	Represents a field on the board graphically.
+	"""
 	def __init__(self, pos_x, pos_y):
 		self.x = pos_x
 		self.y = pos_y
 		self.rect = pygame.draw.rect(screen, WHITE, (self.x, self.y, 65, 65))
 
 	def highlight(self):
-		# Highlights the field
+		"""
+		Highlights the field graphically, e.g. because a valid move is possible there
+		:return: None
+		"""
 		self.rect = pygame.draw.rect(screen, GREEN, (self.x, self.y, 65, 65))
 
 	def reset(self):
-		# Clears any highlights from the field
+		"""
+		Resets highlighting of the field
+		:return: None
+		"""
 		self.rect = pygame.draw.rect(screen, WHITE, (self.x, self.y, 65, 65))
 
 	def is_clicked(self, mouse_x, mouse_y):
-		# Checks if the field has been clicked
+		"""
+		Checks whether a field has been clicked
+		:param mouse_x: x-coordinate of the cursor position
+		:param mouse_y: y-coordinate of the cursor position
+		:return: True if a field has been clicked
+		"""
 		return True if self.rect.collidepoint(mouse_x, mouse_y) else False
 
 	def draw_mark(self, player_id):
-		# Draws the mark of the current player on the field
+		"""
+		Draws the player's stone on the field
+		:param player_id: ID of the player; 1 means black, -1 means white
+		:return: None
+		"""
 		if player_id == 1:
 			self.rect = pygame.draw.rect(screen, WHITE, (self.x, self.y, 65, 65))
 			pygame.draw.circle(screen, BLACK, (self.x + 32, self.y + 32), 28, 0)
@@ -229,25 +244,34 @@ class Field(object):
 
 
 class Player(object):
-	# Represents the black and white players
+	"""
+	Represents a player in the game. The black player's ID is 1, the white player's ID is -1, The IDs are used to
+	mark the position of the player's stones on the board.
+	"""
 	def __init__(self, colour):
 		self.id = 1 if colour == 'black' else -1
 		self.colour = colour
 		self.valid_moves = []
 
 	def get_valid_moves(self, state):
-		# Checks whether there are valid moves for the player
+		"""
+		Checks whether there are any valid moves for the player on the board. A move is considered valid if it leads
+		to stones of the opponents being flipped.
+		:param state: Current board object
+		:return: Array with all valid moves for the player
+		"""
 		self.valid_moves.clear()
 		empty_fields = np.transpose(np.where(state.board == 0))
 		for field in empty_fields:
 			if state.find_flanks(field, self.id, False):
 				self.valid_moves.append(field.tolist())
 		state.draw_valid_moves(self.valid_moves)
-		# Log whether there is a valid move for the player
+		# Log whether there is any valid move for the player
 		state.no_moves_possible[self.id] = True if len(self.valid_moves) == 0 else False
 		return self.valid_moves
 
 
 # Start application
 if __name__ == '__main__':
-	OthelloGame()
+	game = OthelloGame()
+	game.play_game()
