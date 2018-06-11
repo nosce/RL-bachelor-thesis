@@ -23,9 +23,9 @@ if __name__ == '__main__':
 	learning_rate_decay = np.linspace(0, learning_rate_max, num=EPISODES)
 	game_results = {}  # Storage for game results
 
-	# Initialize game and players; set DQN agents to True if they are to be trained
-	player1 = SarsaAgent('X')
-	player2 = SarsaAgent('O')
+	# Initialize game and players; set agents to True if they are to be trained
+	player1 = SarsaAgent('X', True)
+	player2 = SarsaAgent('O', True)
 	game = TicTacToeGame(player1, player2)
 
 	# Start measuring time
@@ -50,8 +50,10 @@ if __name__ == '__main__':
 	with open("training_results/ttt_results_{}_{}-vs-{}.json".format(EPISODES, player1.method, player2.method),
 			  "w") as file:
 		file.write(json.dumps(game_results, indent=3, sort_keys=True))
-	# Write q-table into a file
-	with open("training_results/ttt_table_{}_{}.json".format(player1.method, EPISODES), "w") as file:
+	# Write q-tables of players into a file
+	with open("training_results/ttt_table_{}_{}_{}.json".format(player1.mark, player1.method, EPISODES), "w") as file:
 		file.write(player1.print_qtable())
+	with open("training_results/ttt_table_{}_{}_{}.json".format(player2.mark, player2.method, EPISODES), "w") as file:
+		file.write(player2.print_qtable())
 
 	print("Training finished. Game results saved")

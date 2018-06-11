@@ -4,14 +4,15 @@ __Player: Serves as parent class for all agents and implements common functions 
 __RandomAgent: This agents makes random moves based on all valid moves in a certain board state
 __QAgent: This agent uses Q-learning to store and update Q-values for state-action-pairs. When initializing the agent,
 			it can be specified whether the agent should be trained (True) or a stored Q-table should be loaded.
-			The stored Q-table must be specified in a file: /training_results/qtable.json
+			The stored Q-table must be specified in a file: training_results/qtable.json
 __SarsaAgent: This agent uses SARSA to store and update Q-values for state-action-pairs. When initializing the agent,
 			it can be specified whether the agent should be trained (True) or a stored Q-table should be loaded.
-			The stored Q-table must be specified in a file: /training_results/sarsa-table.json
+			The stored Q-table must be specified in a file: training_results/sarsa-table.json
 """
-# TODO add loading of q-table and sarsa-table
+
 import numpy as np
 import json
+from ast import literal_eval
 
 __author__ = "Claudia Kutter"
 __license__ = "GPL"
@@ -27,16 +28,16 @@ class Player(object):
 	mark the position of the player's stones on the board.
 	"""
 
-	def __init__(self, mark):
+	def __init__(self, mark, train):
 		self.id = 1 if mark == 'X' else -1
 		self.mark = mark
 		self.reward = None
 		self.total_reward = 0  # Reward accumulated during all games
-		self.moves = -1  # Number of moves during the game; starts with -1 to correct final
-		# move selection when game is already over
+		self.moves = -1  # Number of moves; starts with -1 to correct final move selection when game is already over
 		self.last_state = None
 		self.last_action = None
 		self.qtable = {}  # Q-table for storing state-action-values
+		self.train = train
 
 	def reset_for_new_game(self, epsilon, alpha):
 		"""
@@ -103,18 +104,26 @@ class Player(object):
 	def select_action(self, state):
 		pass
 
+	def load_table(self, file):
+		with open(file) as json_data:
+			table = json.load(json_data)
+		for key, value in table.items():
+			self.qtable[literal_eval(key)] = value
+
 
 class QAgent(Player):
 	"""
 	Agent using Q-learning for learning and selecting game moves
 	"""
 
-	def __init__(self, mark):
-		Player.__init__(self, mark)
+	def __init__(self, mark, train):
+		Player.__init__(self, mark, train)
 		self.method = "QL"
 		self.epsilon = 0.5  # chance of exploration instead of exploitation
 		self.alpha = 0.8  # learning rate
 		self.gamma = 0.9  # discount factor for future rewards
+		if not self.train:
+			self.load_table('training_results/qtable.json')
 
 	def reset_for_new_game(self, epsilon, alpha):
 		"""
@@ -137,7 +146,8 @@ class QAgent(Player):
 		:param state: Current board state as a tuple
 		:return: Selected action as tuple (row, column)
 		"""
-		self.update_qtable(state)
+		if self.train:
+			self.update_qtable(state)
 		return self.select_action(state)
 
 	def select_action(self, board_state):
@@ -195,14 +205,16 @@ class SarsaAgent(Player):
 	Agent using SARSA for learning and selecting game moves
 	"""
 
-	def __init__(self, mark):
-		Player.__init__(self, mark)
+	def __init__(self, mark, train):
+		Player.__init__(self, mark, train)
 		self.method = "SARSA"
 		self.epsilon = 0.5  # chance of exploration instead of exploitation
 		self.alpha = 0.8  # learning rate
 		self.gamma = 0.9  # discount factor for future rewards
 		self.current_state = None
 		self.current_action = None
+		if not self.train:
+			self.load_table('training_results/sarsa-table.json')
 
 	def reset_for_new_game(self, epsilon, alpha):
 		"""
@@ -228,7 +240,8 @@ class SarsaAgent(Player):
 		:return: Selected action as tuple (row, column)
 		"""
 		action = self.select_action(state)
-		self.update_qtable()
+		if self.train:
+			self.update_qtable()
 		return action
 
 	def select_action(self, board_state):
