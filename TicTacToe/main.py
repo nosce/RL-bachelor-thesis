@@ -16,7 +16,7 @@ __status__ = "Prototype"
 
 # Start application
 if __name__ == '__main__':
-	EPISODES = 100  # Number of episodes to play
+	EPISODES = 20000  # Number of episodes to play
 	epsilon_max = 0.8  # Starting value for exploration
 	epsilon_decay = np.linspace(0, epsilon_max, num=EPISODES)
 	learning_rate_max = 0.5  # Starting value for learning rate
@@ -24,8 +24,8 @@ if __name__ == '__main__':
 	game_results = {}  # Storage for game results
 
 	# Initialize game and players; set agents to True if they are to be trained
-	player1 = SarsaAgent('X', True)
-	player2 = SarsaAgent('O', True)
+	player1 = QAgent('X', True)
+	player2 = QAgent('O', True)
 	game = TicTacToeGame(player1, player2)
 
 	# Start measuring time

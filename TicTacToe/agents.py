@@ -28,7 +28,7 @@ class Player(object):
 	mark the position of the player's stones on the board.
 	"""
 
-	def __init__(self, mark, train):
+	def __init__(self, mark):
 		self.id = 1 if mark == 'X' else -1
 		self.mark = mark
 		self.reward = None
@@ -37,7 +37,6 @@ class Player(object):
 		self.last_state = None
 		self.last_action = None
 		self.qtable = {}  # Q-table for storing state-action-values
-		self.train = train
 
 	def reset_for_new_game(self, epsilon, alpha):
 		"""
@@ -117,11 +116,12 @@ class QAgent(Player):
 	"""
 
 	def __init__(self, mark, train):
-		Player.__init__(self, mark, train)
+		Player.__init__(self, mark)
 		self.method = "QL"
 		self.epsilon = 0.5  # chance of exploration instead of exploitation
 		self.alpha = 0.8  # learning rate
 		self.gamma = 0.9  # discount factor for future rewards
+		self.train = train
 		if not self.train:
 			self.load_table('training_results/qtable.json')
 
@@ -206,13 +206,14 @@ class SarsaAgent(Player):
 	"""
 
 	def __init__(self, mark, train):
-		Player.__init__(self, mark, train)
+		Player.__init__(self, mark)
 		self.method = "SARSA"
 		self.epsilon = 0.5  # chance of exploration instead of exploitation
 		self.alpha = 0.8  # learning rate
 		self.gamma = 0.9  # discount factor for future rewards
 		self.current_state = None
 		self.current_action = None
+		self.train = train
 		if not self.train:
 			self.load_table('training_results/sarsa-table.json')
 
