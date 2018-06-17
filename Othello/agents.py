@@ -24,6 +24,7 @@ __status__ = "Prototype"
 random.seed(42)  # For reproducibility
 np.random.seed(42)
 
+
 class Player(object):
 	"""
 	Represents a player in the game. The black player's ID is 1, the white player's ID is -1, The IDs are used to
@@ -113,14 +114,10 @@ class DQNAgent(Player):
 		model.add(Flatten(input_shape=(8, 8, 2)))
 		model.add(Dense(256))
 		model.add(Activation('relu'))
-		model.add(Dense(256))
-		model.add(Activation('relu'))
-		model.add(Dense(128))
-		model.add(Activation('relu'))
 		model.add(Dense(128))
 		model.add(Activation('relu'))
 		model.add(Dense(64))
-		model.compile(loss='mse', optimizer='sgd')
+		model.compile(loss='mse', optimizer='rmsprop')
 		return model
 
 	def reset_for_new_game(self, eps):
