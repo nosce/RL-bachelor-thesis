@@ -11,7 +11,9 @@ __DQNAgent: This agent uses a deep Q-network to estimate the next best move. Whe
 import random
 import numpy as np
 from keras.models import Sequential
-from keras.layers import Dense, Flatten
+from keras.layers import Dense, Flatten, Conv2D, Activation
+from keras.optimizers import SGD
+from keras.activations import relu, softmax
 from collections import deque
 
 __author__ = "Claudia Kutter"
@@ -35,7 +37,6 @@ class Player(object):
 		self.reward = None
 		self.total_reward = 0  # Reward accumulated during the game
 		self.moves = 0  # Number of moves during the game
-		self.total_moves = 0  # Total number of moves in all episodes
 		self.invalid_moves = 0  # Number of invalid moves during the game
 
 	def reset_for_new_game(self, eps):
@@ -93,6 +94,7 @@ class DQNAgent(Player):
 		self.last_action = None
 		self.gamma = 0.9  # Weight for future rewards
 		self.epsilon = 1.0  # Exploration rate will be set during resetting
+		self.alpha = 0.9  # Learning rate
 		self.memory = deque(maxlen=2000)  # Sets capacity of replay memory D
 		self.training_model = self.setup_network()  # Network for playing (Q)
 		self.target_model = self.setup_network()  # Network to be trained (Q^)
@@ -100,7 +102,7 @@ class DQNAgent(Player):
 		self.train = train  # Whether agent should be trained or only use its current knowledge
 		if not self.train:
 			self.training_model.load_weights('training_results/final_weights_{}.h5')
-			self.training_model.compile(loss='mean_squared_error', optimizer='sgd')
+			self.training_model.compile(loss='mean_squared_error', optimizer=SGD(lr=self.alpha))
 
 	def setup_network(self):
 		"""
@@ -109,10 +111,15 @@ class DQNAgent(Player):
 		"""
 		model = Sequential()
 		model.add(Flatten(input_shape=(8, 8, 2)))
-		model.add(Dense(256, activation='relu'))
-		model.add(Dense(128, activation='relu'))
-		model.add(Dense(128, activation='relu'))
-		model.add(Dense(64, activation='linear'))
+		model.add(Dense(256))
+		model.add(Activation('relu'))
+		model.add(Dense(256))
+		model.add(Activation('relu'))
+		model.add(Dense(128))
+		model.add(Activation('relu'))
+		model.add(Dense(128))
+		model.add(Activation('relu'))
+		model.add(Dense(64))
 		model.compile(loss='mse', optimizer='sgd')
 		return model
 
@@ -138,7 +145,6 @@ class DQNAgent(Player):
 		"""
 		self.last_state = state
 		self.moves += 1
-		self.total_moves += 1
 		# Makes a random move
 		if len(self.valid_moves) > 0:
 			# Select random move with probability epsilon
@@ -154,7 +160,7 @@ class DQNAgent(Player):
 			self.last_action = -1, -1
 		return self.last_action
 
-	def learn(self, new_state, done):
+	def learn(self, new_state, done, steps):
 		"""
 		If training is activated, the agent stores its experience and learns based on its replay memory
 		:param new_state: New board state after an action
@@ -166,8 +172,8 @@ class DQNAgent(Player):
 			self.remember(new_state, done)
 			# Mini-batch gradient descent
 			self.replay()
-			# Reset target network every c steps
-			if self.total_moves > 0 and self.total_moves % self.c == 0:
+			# Reset target network every c and c-1 steps (twice so that networks of both players are reset)
+			if steps % self.c == 0 or steps % self.c == 1:
 				self.reset_target_network()
 
 	def remember(self, new_state, done):
@@ -208,14 +214,7 @@ class DQNAgent(Player):
 		"""
 		self.training_model.save_weights('training_results/weights_{}.h5'.format(self.colour), overwrite=True)
 		self.target_model.load_weights('training_results/weights_{}.h5'.format(self.colour))
-		self.target_model.compile(loss='mse', optimizer='sgd')
-
-	def store_network(self):
-		"""
-		Stores the network parameters of the training model
-		:return: None
-		"""
-		self.training_model.save_weights('training_results/final_weights_{}.h5'.format(self.colour), overwrite=True)
+		self.target_model.compile(loss='mse', optimizer=SGD(lr=self.alpha))
 
 
 class RandomAgent(Player):
