@@ -1,7 +1,7 @@
 """
 Starts playing the game Othello with the given agents. Either random agents or agents using a deep Q-network
 can be used.
-When playing with random agents still a learning rate epsilon is needed, however, it has no consequence regarding
+When playing with random agents still a exploration rate epsilon is needed, however, it has no consequence regarding
 the moves which the agent selects.
 """
 import json
@@ -15,10 +15,10 @@ __status__ = "Prototype"
 
 # Start application
 if __name__ == '__main__':
-	EPISODES = 1000  # Number of episodes to play
-	epsilon_start = 1.0  # Starting value for exploration
-	epsilon_end = 0.05  # Lowest value for exploration
-	epsilon_decay = np.linspace(0, epsilon_start - epsilon_end, num=EPISODES)  # Steps for decaying exploration
+	EPISODES = 10000  # Number of episodes to play
+	epsilon_max = 1.0  # Starting value for exploration
+	epsilon_min = 0.05  # Lowest value for exploration
+	epsilon_decay = 1 / (EPISODES // 4)  # Steps for decaying exploration
 	game_results = {}  # Storage for game results
 
 	# Initialize game and players; set DQN agents to True if they are to be trained
@@ -32,7 +32,7 @@ if __name__ == '__main__':
 
 	# Start playing episodes
 	for episode in range(EPISODES):
-		epsilon = epsilon_start - epsilon_decay[episode]
+		epsilon = max(epsilon_min, epsilon_max - episode * epsilon_decay)
 		result = game.play_game(epsilon)
 		# Store results
 		game_results[str(episode + 1)] = result
@@ -41,8 +41,8 @@ if __name__ == '__main__':
 	# Store results
 	cpu_time = process_time() - cpu_start
 	clock_time = perf_counter() - clock_start
-	game_results["cpu-time"] = cpu_time
-	game_results["clock-time"] = clock_time
+	game_results['-1'] = {"cpu-time": cpu_time,
+						  "clock-time": clock_time}
 	# Write all results into a file
 	with open("training_results/othello_results_{}.json".format(EPISODES), "w") as file:
 		file.write(json.dumps(game_results, indent=3, sort_keys=True))

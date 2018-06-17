@@ -16,7 +16,7 @@ random.seed(42)  # For reproducibility
 # GUI configuration
 WHITE = (255, 255, 255)
 BLACK = (41, 40, 48)
-GRAY = (246, 246, 246)
+YELLOW = (255, 255, 222)
 DARKGRAY = (195, 195, 195)
 RED = (205, 35, 84)
 GREEN = (233, 243, 237)
@@ -30,7 +30,7 @@ GAME_WON = 1
 GAME_LOST = -1
 GAME_DRAW = 0
 VALID_MOVE = 0
-INVALID_MOVE = -1
+INVALID_MOVE = -10
 
 
 class OthelloGame(object):
@@ -42,7 +42,6 @@ class OthelloGame(object):
 		self.game_board = Board()
 		self.player_b = player_black
 		self.player_w = player_white
-		self.steps = 0  # Count playing steps
 
 	def play_game(self, eps):
 		"""
@@ -62,19 +61,23 @@ class OthelloGame(object):
 		# Game loop
 		while True:
 			fps_clock.tick()
-			self.steps += 1
 			# Check if game is still running
-			if self.game_board.gameover() or not self.game_board.game_running:
+			if self.game_board.gameover() or self.game_board.cheated:
 				state = self.game_board.get_state()
-				for player in players:
-					if self.game_board.winner == 0:
-						reward = GAME_DRAW
-					elif player.id == self.game_board.winner:
-						reward = GAME_WON
-					else:
-						reward = GAME_LOST
-					player.store_reward(reward)
-					current_player.learn(state, True, self.steps)
+				# Punish the player that has cheated
+				if self.game_board.cheated:
+					current_player.learn(state, True)
+				# Store game result
+				else:
+					for player in players:
+						if self.game_board.winner == 0:
+							reward = GAME_DRAW
+						elif player.id == self.game_board.winner:
+							reward = GAME_WON
+						else:
+							reward = GAME_LOST
+						player.store_reward(reward)
+						player.learn(state, True)
 				break
 
 			else:
@@ -87,7 +90,7 @@ class OthelloGame(object):
 					current_player = self.player_w if current_player == self.player_b else self.player_b
 				else:
 					# Learn from the move
-					current_player.learn(state, False, self.steps)
+					current_player.learn(state, False)
 					self.game_board.draw_valid_moves(all_valid_moves)
 					# Select action
 					action = current_player.select_action(state)
@@ -97,9 +100,6 @@ class OthelloGame(object):
 					if valid_move:
 						# Switch player
 						current_player = self.player_w if current_player == self.player_b else self.player_b
-					else:
-						# If invalid move is selected, finish game immediately
-						self.game_board.game_running = False
 
 			# Redisplay
 			pygame.display.flip()
@@ -120,15 +120,14 @@ class Board(object):
 	"""
 	Represents the Othello board as a 8 x 8 matrix and handles board updates and move calculations
 	"""
-
 	def __init__(self):
 		self.board = np.zeros((8, 8), dtype=int)
-		self.action_space = self.board
 		self.fields = {}
 		self.no_moves_possible = {}
 		self.black = 2
 		self.white = 2
 		self.game_running = True
+		self.cheated = False
 		self.winner = -2
 		self.draw_board()
 
@@ -207,6 +206,7 @@ class Board(object):
 			field = self.fields[field_id]
 			field.draw_mark(player.id)
 		else:
+			self.cheated = True
 			reward = INVALID_MOVE
 			player.invalid_moves += 1
 		# Count stones on board
@@ -288,34 +288,24 @@ class Field(object):
 	"""
 	Represents a field on the board graphically
 	"""
-
 	def __init__(self, pos_x, pos_y):
 		self.x = pos_x
 		self.y = pos_y
-		self.rect = pygame.draw.rect(screen, WHITE, (self.x, self.y, 65, 65))
+		self.rect = pygame.draw.rect(screen, GREEN, (self.x, self.y, 65, 65))
 
 	def highlight(self):
 		"""
 		Highlights the field graphically, e.g. because a valid move is possible there
 		:return: None
 		"""
-		self.rect = pygame.draw.rect(screen, GREEN, (self.x, self.y, 65, 65))
+		self.rect = pygame.draw.rect(screen, YELLOW, (self.x, self.y, 65, 65))
 
 	def reset(self):
 		"""
 		Resets highlighting of the field
 		:return: None
 		"""
-		self.rect = pygame.draw.rect(screen, WHITE, (self.x, self.y, 65, 65))
-
-	def is_clicked(self, mouse_x, mouse_y):
-		"""
-		Checks whether a field has been clicked
-		:param mouse_x: x-coordinate of the cursor position
-		:param mouse_y: y-coordinate of the cursor position
-		:return: True if a field has been clicked
-		"""
-		return True if self.rect.collidepoint(mouse_x, mouse_y) else False
+		self.rect = pygame.draw.rect(screen, GREEN, (self.x, self.y, 65, 65))
 
 	def draw_mark(self, player_id):
 		"""
@@ -324,9 +314,9 @@ class Field(object):
 		:return: None
 		"""
 		if player_id == 1:
-			self.rect = pygame.draw.rect(screen, WHITE, (self.x, self.y, 65, 65))
+			self.rect = pygame.draw.rect(screen, GREEN, (self.x, self.y, 65, 65))
 			pygame.draw.circle(screen, BLACK, (self.x + 32, self.y + 32), 28, 0)
 		else:
-			self.rect = pygame.draw.rect(screen, WHITE, (self.x, self.y, 65, 65))
-			pygame.draw.circle(screen, GRAY, (self.x + 32, self.y + 32), 28, 0)
+			self.rect = pygame.draw.rect(screen, GREEN, (self.x, self.y, 65, 65))
+			pygame.draw.circle(screen, WHITE, (self.x + 32, self.y + 32), 28, 0)
 			pygame.draw.circle(screen, DARKGRAY, (self.x + 32, self.y + 32), 28, 1)

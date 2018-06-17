@@ -10,10 +10,8 @@ __DQNAgent: This agent uses a deep Q-network to estimate the next best move. Whe
 
 import random
 import numpy as np
-import tensorflow
 from keras.models import Sequential
-from keras.layers import Dense, Flatten, Conv2D, BatchNormalization, LeakyReLU, Activation
-from keras.optimizers import SGD
+from keras.layers import Dense, Flatten
 from collections import deque
 
 __author__ = "Claudia Kutter"
@@ -22,7 +20,7 @@ __copyright__ = "Copyright 2018"
 __status__ = "Prototype"
 
 random.seed(42)  # For reproducibility
-
+np.random.seed(42)
 
 class Player(object):
 	"""
@@ -37,6 +35,7 @@ class Player(object):
 		self.reward = None
 		self.total_reward = 0  # Reward accumulated during the game
 		self.moves = 0  # Number of moves during the game
+		self.total_moves = 0  # Total number of moves in all episodes
 		self.invalid_moves = 0  # Number of invalid moves during the game
 
 	def reset_for_new_game(self, eps):
@@ -47,7 +46,6 @@ class Player(object):
 		:return: None
 		"""
 		self.reward = None
-		self.total_reward = 0
 		self.moves = 0
 		self.invalid_moves = 0
 
@@ -78,7 +76,7 @@ class Player(object):
 		self.reward = reward
 		self.total_reward += reward
 
-	def learn(self, new_state, done, steps):
+	def learn(self, new_state, done):
 		pass
 
 	def select_action(self, state):
@@ -89,24 +87,22 @@ class DQNAgent(Player):
 	"""
 	Agent using a Deep Q-Network (DQN) for learning and selecting game moves
 	"""
-
 	def __init__(self, colour, train):
 		Player.__init__(self, colour)
 		self.last_state = None
 		self.last_action = None
 		self.gamma = 0.9  # Weight for future rewards
-		self.epsilon = 0.9  # Exploration rate
+		self.epsilon = 1.0  # Exploration rate will be set during resetting
 		self.memory = deque(maxlen=2000)  # Sets capacity of replay memory D
 		self.training_model = self.setup_network()  # Network for playing (Q)
 		self.target_model = self.setup_network()  # Network to be trained (Q^)
 		self.c = 300  # Rate at which the target network is reset
-		self.train = train
+		self.train = train  # Whether agent should be trained or only use its current knowledge
 		if not self.train:
 			self.training_model.load_weights('training_results/final_weights_{}.h5')
 			self.training_model.compile(loss='mean_squared_error', optimizer='sgd')
 
-	@staticmethod
-	def setup_network():
+	def setup_network(self):
 		"""
 		Sets up the layers of the neural network
 		:return: Model of the neural network
@@ -115,17 +111,14 @@ class DQNAgent(Player):
 		model.add(Flatten(input_shape=(8, 8, 2)))
 		model.add(Dense(256, activation='relu'))
 		model.add(Dense(128, activation='relu'))
+		model.add(Dense(128, activation='relu'))
 		model.add(Dense(64, activation='linear'))
-		# Convolutional layers
-		# model.add(Conv2D(64, (3, 3), input_shape=(8, 8, 2), padding='same', use_bias='False', activation='linear'))
-		# model.add(BatchNormalization(axis=1))
-		# model.add(LeakyReLU())
-		model.compile(loss='mse', optimizer=SGD(lr=0.9))
+		model.compile(loss='mse', optimizer='sgd')
 		return model
 
 	def reset_for_new_game(self, eps):
 		"""
-		Resets variables for storing game states, moves and rewards when. Required when agent plays multiple episodes
+		Resets variables for storing game states, moves and rewards. Required when agent plays multiple episodes
 		of the game in a row.
 		:param eps: Exploration rate of the agent
 		:return: None
@@ -134,9 +127,7 @@ class DQNAgent(Player):
 		self.last_state = None
 		self.last_action = None
 		self.reward = None
-		self.total_reward = 0
 		self.moves = 0
-		self.invalid_moves = 0
 
 	def select_action(self, state):
 		"""
@@ -147,6 +138,7 @@ class DQNAgent(Player):
 		"""
 		self.last_state = state
 		self.moves += 1
+		self.total_moves += 1
 		# Makes a random move
 		if len(self.valid_moves) > 0:
 			# Select random move with probability epsilon
@@ -162,12 +154,11 @@ class DQNAgent(Player):
 			self.last_action = -1, -1
 		return self.last_action
 
-	def learn(self, new_state, done, steps):
+	def learn(self, new_state, done):
 		"""
 		If training is activated, the agent stores its experience and learns based on its replay memory
 		:param new_state: New board state after an action
 		:param done: Boolean value whether state is a final state that ends the game
-		:param steps: Number of game steps in all episodes until now
 		:return: None
 		"""
 		if self.train:
@@ -175,8 +166,8 @@ class DQNAgent(Player):
 			self.remember(new_state, done)
 			# Mini-batch gradient descent
 			self.replay()
-			# Reset target network every c and c-1 steps (twice so that networks of both players are reset)
-			if steps % self.c == 0 or steps % self.c == 1:
+			# Reset target network every c steps
+			if self.total_moves > 0 and self.total_moves % self.c == 0:
 				self.reset_target_network()
 
 	def remember(self, new_state, done):
@@ -186,7 +177,7 @@ class DQNAgent(Player):
 		:param done: Boolean value whether game is over or not
 		:return: None
 		"""
-		if not ((self.last_state is None) and (self.last_action is None) and (self.reward is None)):
+		if not ((self.last_state is None) or (self.last_action is None) or (self.reward is None)):
 			self.memory.append([self.last_state, self.last_action, self.reward, new_state, done])
 
 	def replay(self):
@@ -200,9 +191,9 @@ class DQNAgent(Player):
 		samples = random.sample(self.memory, batch_size)
 		for sample in samples:
 			state, action, reward, new_state, done = sample
-			target = self.target_model.predict(state)
 			# Actions are given as field indexes (row, column) and must be flattened to fit the format of the prediction
 			action_index = action[0] * 8 + action[1]
+			target = self.target_model.predict(state)
 			if done:
 				target[0][action_index] = reward
 			else:
