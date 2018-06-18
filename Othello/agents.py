@@ -12,8 +12,8 @@ import random
 import numpy as np
 from keras.models import Sequential
 from keras.layers import Dense, Flatten, Conv2D, Activation
-from keras.optimizers import SGD
 from keras.activations import relu, softmax
+from keras.optimizers import SGD
 from collections import deque
 
 __author__ = "Claudia Kutter"
@@ -23,7 +23,6 @@ __status__ = "Prototype"
 
 random.seed(42)  # For reproducibility
 np.random.seed(42)
-
 
 class Player(object):
 	"""
@@ -38,7 +37,7 @@ class Player(object):
 		self.reward = None
 		self.total_reward = 0  # Reward accumulated during the game
 		self.moves = 0  # Number of moves during the game
-		self.invalid_moves = 0  # Number of invalid moves during the game
+		self.total_moves = 0  # Total number of moves in all episodes
 
 	def reset_for_new_game(self, eps):
 		"""
@@ -49,7 +48,6 @@ class Player(object):
 		"""
 		self.reward = None
 		self.moves = 0
-		self.invalid_moves = 0
 
 	def get_valid_moves(self, state):
 		"""
@@ -95,15 +93,14 @@ class DQNAgent(Player):
 		self.last_action = None
 		self.gamma = 0.9  # Weight for future rewards
 		self.epsilon = 1.0  # Exploration rate will be set during resetting
-		self.alpha = 0.9  # Learning rate
-		self.memory = deque(maxlen=2000)  # Sets capacity of replay memory D
+		self.memory = deque(maxlen=1000)  # Sets capacity of replay memory D
 		self.training_model = self.setup_network()  # Network for playing (Q)
 		self.target_model = self.setup_network()  # Network to be trained (Q^)
-		self.c = 300  # Rate at which the target network is reset
+		self.c = 500  # Rate at which the target network is reset
 		self.train = train  # Whether agent should be trained or only use its current knowledge
 		if not self.train:
 			self.training_model.load_weights('training_results/final_weights_{}.h5')
-			self.training_model.compile(loss='mean_squared_error', optimizer=SGD(lr=self.alpha))
+			self.training_model.compile(loss='mean_squared_error', optimizer=SGD(lr=0.01, decay=1e-6))
 
 	def setup_network(self):
 		"""
@@ -111,13 +108,29 @@ class DQNAgent(Player):
 		:return: Model of the neural network
 		"""
 		model = Sequential()
-		model.add(Flatten(input_shape=(8, 8, 2)))
-		model.add(Dense(256))
+		# Fully Connected
+		# model.add(Dense(64, input_dim=64))
+		# model.add(Activation('relu'))
+		# model.add(Dense(128))
+		# model.add(Activation('relu'))
+		# model.add(Dense(128))
+		# model.add(Activation('relu'))
+		# model.add(Dense(64))
+		# model.add(Activation('linear'))
+		# model.compile(loss='mean_squared_error', optimizer=SGD(lr=0.01, decay=1e-6))
+
+		# Convolutional
+		model.add(Conv2D(64, (3, 3), input_shape=(8, 8, 2), padding='same'))
 		model.add(Activation('relu'))
-		model.add(Dense(128))
+		model.add(Conv2D(128, (3, 3), padding='same'))
 		model.add(Activation('relu'))
+		model.add(Conv2D(128, (3, 3), padding='same'))
+		model.add(Activation('relu'))
+		model.add(Flatten())
 		model.add(Dense(64))
-		model.compile(loss='mse', optimizer='rmsprop')
+		model.add(Activation('softmax'))
+		model.compile(loss='mean_squared_error', optimizer=SGD(lr=0.01, decay=1e-6))
+
 		return model
 
 	def reset_for_new_game(self, eps):
@@ -142,6 +155,7 @@ class DQNAgent(Player):
 		"""
 		self.last_state = state
 		self.moves += 1
+		self.total_moves += 1
 		# Makes a random move
 		if len(self.valid_moves) > 0:
 			# Select random move with probability epsilon
@@ -157,7 +171,7 @@ class DQNAgent(Player):
 			self.last_action = -1, -1
 		return self.last_action
 
-	def learn(self, new_state, done, steps):
+	def learn(self, new_state, done):
 		"""
 		If training is activated, the agent stores its experience and learns based on its replay memory
 		:param new_state: New board state after an action
@@ -169,8 +183,8 @@ class DQNAgent(Player):
 			self.remember(new_state, done)
 			# Mini-batch gradient descent
 			self.replay()
-			# Reset target network every c and c-1 steps (twice so that networks of both players are reset)
-			if steps % self.c == 0 or steps % self.c == 1:
+			# Reset target network every c steps
+			if self.total_moves > 0 and self.total_moves % self.c == 0:
 				self.reset_target_network()
 
 	def remember(self, new_state, done):
@@ -191,18 +205,32 @@ class DQNAgent(Player):
 		batch_size = 32
 		if len(self.memory) < batch_size:
 			return
+		# Input vector
+		inputs = []
+		# Target vector
+		targets = []
 		samples = random.sample(self.memory, batch_size)
 		for sample in samples:
 			state, action, reward, new_state, done = sample
 			# Actions are given as field indexes (row, column) and must be flattened to fit the format of the prediction
 			action_index = action[0] * 8 + action[1]
-			target = self.target_model.predict(state)
+			# Add the state to the input
+			inputs.append(state[0])
+			# Calculate predictions from target model
+			target = self.target_model.predict(state)[0]
+			# Overwrite with experience or value according to Q-function
 			if done:
-				target[0][action_index] = reward
+				target[action_index] = reward
 			else:
 				future_return = np.max(self.target_model.predict(new_state))
-				target[0][action_index] = reward + self.gamma * future_return
-			self.training_model.fit(state, target, epochs=1, verbose=0)
+				target[action_index] = reward + self.gamma * future_return
+			# self.training_model.fit(state, target, epochs=1, verbose=0)
+			# Add to target array
+			targets.append(target)
+		# Convert to numpy array to fit keras requirements
+		inputs = np.asarray(inputs)
+		targets = np.asarray(targets)
+		self.training_model.fit(inputs, targets, epochs=1, verbose=False, )
 
 	def reset_target_network(self):
 		"""
@@ -211,7 +239,7 @@ class DQNAgent(Player):
 		"""
 		self.training_model.save_weights('training_results/weights_{}.h5'.format(self.colour), overwrite=True)
 		self.target_model.load_weights('training_results/weights_{}.h5'.format(self.colour))
-		self.target_model.compile(loss='mse', optimizer=SGD(lr=self.alpha))
+		self.target_model.compile(loss='mean_squared_error', optimizer=SGD(lr=0.01, decay=1e-6))
 
 
 class RandomAgent(Player):

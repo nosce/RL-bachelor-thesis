@@ -106,11 +106,8 @@ class OthelloGame(object):
 
 		# At the end of game return the final results of the game
 		for player in players:
-			if isinstance(player, DQNAgent):
-				player.store_network()
 			final_result[player.colour] = {"reward": player.total_reward,
-										   "moves": player.moves,
-										   "invalid": player.invalid_moves}
+										   "moves": player.moves}
 		final_result["winner"] = self.game_board.winner
 		final_result["explore"] = eps
 		return final_result
@@ -145,6 +142,7 @@ class Board(object):
 		white stone placed, else 0)
 		:return: Matrix of current board state
 		"""
+		# Return for Conv
 		black_state = self.board.copy()
 		black_state[black_state == -1] = 0
 		white_state = self.board.copy()
@@ -152,7 +150,12 @@ class Board(object):
 		white_state[white_state == -1] = 1
 		board_state = np.stack((black_state, white_state), axis=-1)
 		board_state = np.expand_dims(board_state, axis=0)
+
+		# Return for Dense
+		# board_state = self.board.flatten()
+		# board_state = np.expand_dims(board_state, axis=0)
 		return board_state
+
 
 	def draw_board(self):
 		"""
@@ -208,7 +211,6 @@ class Board(object):
 		else:
 			self.cheated = True
 			reward = INVALID_MOVE
-			player.invalid_moves += 1
 		# Count stones on board
 		self.black = np.count_nonzero(self.board == 1)
 		self.white = np.count_nonzero(self.board == -1)
