@@ -5,7 +5,8 @@ Each field of the board has an id given as (row_number, column_number).
 Players collect rewards while playing the game: 1 if they win, -1 if they lose and 0 if the game is a draw.
 """
 import pygame
-from Othello.agents import *
+import random
+import numpy as np
 
 __author__ = "Claudia Kutter"
 __license__ = "GPL"
@@ -142,20 +143,9 @@ class Board(object):
 		white stone placed, else 0)
 		:return: Matrix of current board state
 		"""
-		# Return for Conv
-		# black_state = self.board.copy()
-		# black_state[black_state == -1] = 0
-		# white_state = self.board.copy()
-		# white_state[white_state == 1] = 0
-		# white_state[white_state == -1] = 1
-		# board_state = np.stack((black_state, white_state), axis=-1)
-		# board_state = np.expand_dims(board_state, axis=0)
-
-		# Return for Dense
 		board_state = self.board.flatten()
 		board_state = np.expand_dims(board_state, axis=0)
 		return board_state
-
 
 	def draw_board(self):
 		"""

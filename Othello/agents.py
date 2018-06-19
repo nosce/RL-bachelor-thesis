@@ -100,7 +100,7 @@ class DQNAgent(Player):
 		self.train = train  # Whether agent should be trained or only use its current knowledge
 		if not self.train:
 			self.training_model.load_weights('training_results/final_weights_{}.h5')
-			self.training_model.compile(loss='mean_squared_error', optimizer=SGD(lr=0.01, decay=1e-6))
+			self.training_model.compile(loss='mean_squared_error', optimizer='rmsprop')
 
 	def setup_network(self):
 		"""
@@ -108,25 +108,10 @@ class DQNAgent(Player):
 		:return: Model of the neural network
 		"""
 		model = Sequential()
-		# Fully Connected
-		# model.add(Flatten(input_shape=(8, 8, 2)))
-		model.add(Dense(256, input_dim=64, activation='relu'))
-		model.add(Dense(128, activation='relu'))
+		model.add(Dense(512, input_dim=64, activation='relu'))
+		model.add(Dense(256, activation='relu'))
 		model.add(Dense(64, activation='linear'))
-		model.compile(loss='mse', optimizer='rmsprop')
-
-		# Convolutional
-		# model.add(Conv2D(64, (3, 3), input_shape=(8, 8, 2), padding='same'))
-		# model.add(Activation('relu'))
-		# model.add(Conv2D(128, (3, 3), padding='same'))
-		# model.add(Activation('relu'))
-		# model.add(Conv2D(128, (3, 3), padding='same'))
-		# model.add(Activation('relu'))
-		# model.add(Flatten())
-		# model.add(Dense(64))
-		# model.add(Activation('softmax'))
-		#model.compile(loss='mean_squared_error', optimizer=SGD(lr=0.01, decay=1e-6))
-
+		model.compile(loss='mean_squared_error', optimizer='rmsprop')
 		return model
 
 	def reset_for_new_game(self, eps):
@@ -190,7 +175,7 @@ class DQNAgent(Player):
 		:param done: Boolean value whether game is over or not
 		:return: None
 		"""
-		if not ((self.last_state is None) or (self.last_action is None) or (self.reward is None)):
+		if not any(item is None for item in [self.last_state, self.last_action, self.reward]):
 			self.memory.append([self.last_state, self.last_action, self.reward, new_state, done])
 
 	def replay(self):
@@ -220,7 +205,6 @@ class DQNAgent(Player):
 			else:
 				future_return = np.max(self.target_model.predict(new_state))
 				target[action_index] = reward + self.gamma * future_return
-			# self.training_model.fit(state, target, epochs=1, verbose=0)
 			# Add to target array
 			targets.append(target)
 		# Convert to numpy array to fit keras requirements
@@ -235,7 +219,7 @@ class DQNAgent(Player):
 		"""
 		self.training_model.save_weights('training_results/weights_{}.h5'.format(self.colour), overwrite=True)
 		self.target_model.load_weights('training_results/weights_{}.h5'.format(self.colour))
-		self.target_model.compile(loss='mean_squared_error', optimizer=SGD(lr=0.01, decay=1e-6))
+		self.target_model.compile(loss='mean_squared_error', optimizer='rmsprop')
 
 
 class RandomAgent(Player):

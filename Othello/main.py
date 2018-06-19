@@ -7,6 +7,7 @@ the moves which the agent selects.
 import json
 from time import process_time, perf_counter
 from Othello.game import *
+from Othello.agents import *
 
 __author__ = "Claudia Kutter"
 __license__ = "GPL"
@@ -15,10 +16,10 @@ __status__ = "Prototype"
 
 # Start application
 if __name__ == '__main__':
-	EPISODES = 10000  # Number of episodes to play
+	EPISODES = 80000  # Number of episodes to play
 	epsilon_max = 1.0  # Starting value for exploration
 	epsilon_min = 0.05  # Lowest value for exploration
-	epsilon_decay = 1 / (EPISODES // 4)  # Steps for decaying exploration
+	epsilon_decay = 1 / (EPISODES // 32)  # Steps for decaying exploration
 	game_results = {}  # Storage for game results
 
 	# Initialize game and players; set DQN agents to True if they are to be trained
