@@ -183,7 +183,7 @@ class DQNAgent(Player):
 		Samples a random mini-batch from the replay memory and trains the network parameters based on it
 		:return: None
 		"""
-		batch_size = 32
+		batch_size = 64
 		if len(self.memory) < batch_size:
 			return
 		# Input vector
@@ -210,7 +210,7 @@ class DQNAgent(Player):
 		# Convert to numpy array to fit keras requirements
 		inputs = np.asarray(inputs)
 		targets = np.asarray(targets)
-		self.training_model.fit(inputs, targets, epochs=1, verbose=False, )
+		self.training_model.fit(inputs, targets, epochs=1, verbose=False)
 
 	def reset_target_network(self):
 		"""
