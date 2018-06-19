@@ -109,27 +109,23 @@ class DQNAgent(Player):
 		"""
 		model = Sequential()
 		# Fully Connected
-		# model.add(Dense(64, input_dim=64))
-		# model.add(Activation('relu'))
-		# model.add(Dense(128))
-		# model.add(Activation('relu'))
-		# model.add(Dense(128))
-		# model.add(Activation('relu'))
-		# model.add(Dense(64))
-		# model.add(Activation('linear'))
-		# model.compile(loss='mean_squared_error', optimizer=SGD(lr=0.01, decay=1e-6))
+		# model.add(Flatten(input_shape=(8, 8, 2)))
+		model.add(Dense(256, input_dim=64, activation='relu'))
+		model.add(Dense(128, activation='relu'))
+		model.add(Dense(64, activation='linear'))
+		model.compile(loss='mse', optimizer='rmsprop')
 
 		# Convolutional
-		model.add(Conv2D(64, (3, 3), input_shape=(8, 8, 2), padding='same'))
-		model.add(Activation('relu'))
-		model.add(Conv2D(128, (3, 3), padding='same'))
-		model.add(Activation('relu'))
-		model.add(Conv2D(128, (3, 3), padding='same'))
-		model.add(Activation('relu'))
-		model.add(Flatten())
-		model.add(Dense(64))
-		model.add(Activation('softmax'))
-		model.compile(loss='mean_squared_error', optimizer=SGD(lr=0.01, decay=1e-6))
+		# model.add(Conv2D(64, (3, 3), input_shape=(8, 8, 2), padding='same'))
+		# model.add(Activation('relu'))
+		# model.add(Conv2D(128, (3, 3), padding='same'))
+		# model.add(Activation('relu'))
+		# model.add(Conv2D(128, (3, 3), padding='same'))
+		# model.add(Activation('relu'))
+		# model.add(Flatten())
+		# model.add(Dense(64))
+		# model.add(Activation('softmax'))
+		#model.compile(loss='mean_squared_error', optimizer=SGD(lr=0.01, decay=1e-6))
 
 		return model
 
