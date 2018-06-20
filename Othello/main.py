@@ -39,12 +39,16 @@ if __name__ == '__main__':
 		game_results[str(episode + 1)] = result
 		print("Episode {} finished after {} black moves".format(episode, result["black"]["moves"]))
 
-	# Store results
-	cpu_time = process_time() - cpu_start
-	clock_time = perf_counter() - clock_start
-	game_results['-1'] = {"cpu-time": cpu_time,
-						  "clock-time": clock_time}
-	# Write all results into a file
-	with open("training_results/othello_results_{}.json".format(EPISODES), "w") as file:
-		file.write(json.dumps(game_results, indent=3, sort_keys=True))
+		# Store results every 10,000 steps
+		if (episode + 1) % 10000 == 0:
+			cpu_time = process_time() - cpu_start
+			clock_time = perf_counter() - clock_start
+			game_results['-1'] = {"cpu-time": cpu_time,
+								  "clock-time": clock_time}
+			# Write all results into a file
+			with open("training_results/othello_results_{}.json".format(episode), "w") as file:
+				file.write(json.dumps(game_results, indent=3, sort_keys=True))
+			# Reset storage to save space
+			game_results.clear()
+			print("********* Results stored *********")
 	print("Training finished. Game results saved")
