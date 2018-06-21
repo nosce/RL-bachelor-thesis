@@ -215,7 +215,6 @@ class DQNAgent(Player):
 		inputs = np.asarray(inputs)
 		targets = np.asarray(targets)
 		self.training_model.fit(inputs, targets, epochs=1, verbose=False)
-		inputs.__delitem__()
 
 	def reset_target_network(self):
 		"""
