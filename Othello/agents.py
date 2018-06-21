@@ -2,18 +2,15 @@
 This file contains the implementation of different agents for Othello.
 __Player: Serves as parent class for all agents and implements common functions such as storing rewards
 __RandomAgent: This agents makes random moves based on all valid moves in a certain board state
-__DQNAgent: This agent uses a deep Q-network to estimate the next best move. When initializing the agent,
-			it can be specified whether the agent should be trained (True) or initialize its network with given weights
-			which must be specified in a file: /training_results/final_weights_<colour>.h5 with <colour> being the
-			colour of the agent (black/white)
+__DQNAgent: This agent uses a deep Q-network to estimate the next best move. When initializing the agent, it can be
+			specified whether the agent should be trained (True) or initialize its network with given weights which
+			must be specified in a file: weights_<colour>.h5 with <colour> being the colour of the agent (black/white)
 """
 
 import random
 import numpy as np
 from keras.models import Sequential
-from keras.layers import Dense, Flatten, Conv2D, Activation
-from keras.activations import relu, softmax
-from keras.optimizers import SGD
+from keras.layers import Dense
 from collections import deque
 
 __author__ = "Claudia Kutter"
@@ -23,6 +20,7 @@ __status__ = "Prototype"
 
 random.seed(42)  # For reproducibility
 np.random.seed(42)
+
 
 class Player(object):
 	"""
@@ -93,16 +91,17 @@ class DQNAgent(Player):
 		self.last_action = None
 		self.gamma = 0.9  # Weight for future rewards
 		self.epsilon = 1.0  # Exploration rate will be set during resetting
-		self.memory = deque(maxlen=1000)  # Sets capacity of replay memory D
+		self.memory = deque(maxlen=500)  # Sets capacity of replay memory D
 		self.training_model = self.setup_network()  # Network for playing (Q)
 		self.target_model = self.setup_network()  # Network to be trained (Q^)
 		self.c = 500  # Rate at which the target network is reset
 		self.train = train  # Whether agent should be trained or only use its current knowledge
 		if not self.train:
-			self.training_model.load_weights('training_results/final_weights_{}.h5')
+			self.training_model.load_weights('weights_{}.h5')
 			self.training_model.compile(loss='mean_squared_error', optimizer='rmsprop')
 
-	def setup_network(self):
+	@staticmethod
+	def setup_network():
 		"""
 		Sets up the layers of the neural network
 		:return: Model of the neural network
@@ -175,8 +174,13 @@ class DQNAgent(Player):
 		:param done: Boolean value whether game is over or not
 		:return: None
 		"""
-		if not any(item is None for item in [self.last_state, self.last_action, self.reward]):
-			self.memory.append([self.last_state, self.last_action, self.reward, new_state, done])
+		if self.last_action is None:
+			return
+		if self.reward is None:
+			return
+		if self.last_state is None:
+			return
+		self.memory.append([self.last_state, self.last_action, self.reward, new_state, done])
 
 	def replay(self):
 		"""
@@ -211,14 +215,15 @@ class DQNAgent(Player):
 		inputs = np.asarray(inputs)
 		targets = np.asarray(targets)
 		self.training_model.fit(inputs, targets, epochs=1, verbose=False)
+		inputs.__delitem__()
 
 	def reset_target_network(self):
 		"""
 		Copies the network parameters of the training network to the target network
 		:return: None
 		"""
-		self.training_model.save_weights('training_results/weights_{}.h5'.format(self.colour), overwrite=True)
-		self.target_model.load_weights('training_results/weights_{}.h5'.format(self.colour))
+		self.training_model.save_weights('weights_{}.h5'.format(self.colour), overwrite=True)
+		self.target_model.load_weights('weights_{}.h5'.format(self.colour))
 		self.target_model.compile(loss='mean_squared_error', optimizer='rmsprop')
 
 

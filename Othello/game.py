@@ -31,7 +31,7 @@ GAME_WON = 1
 GAME_LOST = -1
 GAME_DRAW = 0
 VALID_MOVE = 0
-INVALID_MOVE = -10
+INVALID_MOVE = -1
 
 
 class OthelloGame(object):
@@ -43,6 +43,7 @@ class OthelloGame(object):
 		self.game_board = Board()
 		self.player_b = player_black
 		self.player_w = player_white
+		self.final_result = {}
 
 	def play_game(self, eps):
 		"""
@@ -54,9 +55,9 @@ class OthelloGame(object):
 		self.game_board.reset_for_new_game()
 		self.player_b.reset_for_new_game(eps)
 		self.player_w.reset_for_new_game(eps)
+		self.final_result.clear()
 		players = [self.player_b, self.player_w]
 		current_player = self.player_b
-		final_result = {}
 		# Timer
 		fps_clock = pygame.time.Clock()
 		# Game loop
@@ -107,11 +108,11 @@ class OthelloGame(object):
 
 		# At the end of game return the final results of the game
 		for player in players:
-			final_result[player.colour] = {"reward": player.total_reward,
+			self.final_result[player.colour] = {"reward": player.total_reward,
 										   "moves": player.moves}
-		final_result["winner"] = self.game_board.winner
-		final_result["explore"] = eps
-		return final_result
+			self.final_result["winner"] = self.game_board.winner
+			self.final_result["explore"] = eps
+		return self.final_result
 
 
 class Board(object):
