@@ -32,10 +32,13 @@ class Player(object):
 		self.id = 1 if colour == 'black' else -1
 		self.colour = colour
 		self.valid_moves = []
+		self.last_state = None
+		self.last_action = None
 		self.reward = None
 		self.total_reward = 0  # Reward accumulated during the game
 		self.moves = 0  # Number of moves during the game
 		self.total_moves = 0  # Total number of moves in all episodes
+		self.epsilon = 1.0  # Exploration rate will be set during resetting
 
 	def reset_for_new_game(self, eps):
 		"""
@@ -44,6 +47,9 @@ class Player(object):
 		:param eps: Exploration rate of the agent
 		:return: None
 		"""
+		self.epsilon = eps
+		self.last_state = None
+		self.last_action = None
 		self.reward = None
 		self.moves = 0
 
@@ -87,10 +93,7 @@ class DQNAgent(Player):
 	"""
 	def __init__(self, colour, train):
 		Player.__init__(self, colour)
-		self.last_state = None
-		self.last_action = None
 		self.gamma = 0.9  # Weight for future rewards
-		self.epsilon = 1.0  # Exploration rate will be set during resetting
 		self.memory = deque(maxlen=500)  # Sets capacity of replay memory D
 		self.training_model = self.setup_network()  # Network for playing (Q)
 		self.target_model = self.setup_network()  # Network to be trained (Q^)
@@ -112,19 +115,6 @@ class DQNAgent(Player):
 		model.add(Dense(64, activation='linear'))
 		model.compile(loss='mean_squared_error', optimizer='rmsprop')
 		return model
-
-	def reset_for_new_game(self, eps):
-		"""
-		Resets variables for storing game states, moves and rewards. Required when agent plays multiple episodes
-		of the game in a row.
-		:param eps: Exploration rate of the agent
-		:return: None
-		"""
-		self.epsilon = eps
-		self.last_state = None
-		self.last_action = None
-		self.reward = None
-		self.moves = 0
 
 	def select_action(self, state):
 		"""
@@ -246,3 +236,105 @@ class RandomAgent(Player):
 			return tuple(self.valid_moves[np.random.choice(len(self.valid_moves))])
 		else:
 			return -1, -1
+
+
+class QAgent(Player):
+	""""
+	Agent using Q-learning for learning and selecting game moves
+	"""
+
+	def __init__(self, colour, train):
+		Player.__init__(self, colour)
+		self.last_state = None
+		self.last_action = None
+		self.gamma = 0.9  # Weight for future rewards
+		self.alpha = 0.001  # learning rate: default for rmsprop
+		self.epsilon = 1.0  # Exploration rate will be set during resetting
+		self.train = train  # Whether agent should be trained or only use its current knowledge
+		self.qtable = {}  # Q-table for storing state-action-values
+
+	@staticmethod
+	def possible_actions():
+		"""
+		Returns all fields where moves are possible because they are empty
+		:return: Array of empty fields. Fields are given as array [row, column]
+		"""
+		actions = []
+		for row in range(8):
+			for col in range(8):
+				actions.append((row, col))
+		return actions
+
+	def select_action(self, state):
+		"""
+		Stores the board state and selects an action epsilon greedily
+		:param state: Current board state as a tuple
+		:return: Selected action as tuple (row, column)
+		"""
+		# Store board state
+		board_state = tuple(map(tuple, state))
+		self.last_state = board_state
+		# Makes a random move
+		if len(self.valid_moves) > 0:
+			self.moves += 1
+			self.total_moves += 1
+			# Select random move with probability epsilon
+			if random.random() < self.epsilon:
+				action = random.randint(0, 63)
+				self.last_action = (action // 8, action % 8)
+			else:
+				# Get the Q-values for all possible actions in the current state
+				all_qvalues = {}
+				for action in self.possible_actions():
+					qvalue = self.get_qvalue(board_state, action)
+					# Actions are stored by Q-values; some actions might have the same Q-value
+					if qvalue not in all_qvalues:
+						all_qvalues[qvalue] = [action]
+					else:
+						all_qvalues[qvalue].append(action)
+				# Find the highest Q-value and how many actions are linked to it
+				max_qvalue = max(all_qvalues)
+				best_actions = len(all_qvalues[max_qvalue])
+				# If there is more than one best action, choose randomly
+				if best_actions > 1:
+					move = all_qvalues[max_qvalue][np.random.choice(best_actions)]
+				else:
+					move = all_qvalues[max_qvalue][0]
+				self.last_action = move
+		else:
+			self.last_action = -1, -1
+		return self.last_action
+
+	def learn(self, state, done):
+		board_state = tuple(map(tuple, state))
+		if done:
+			self.moves -= 2
+		if self.train:
+			self.update_qtable(board_state)
+		return self.select_action(board_state)
+
+	def update_qtable(self, new_state):
+		"""
+		Recalculates Q-values if values are available, i.e. after one state-action-transition
+		:param new_state: Following state after taking an action
+		:return: None
+		"""
+		if not any(item is None for item in [self.last_state, self.last_action, self.reward]):
+			current_value = self.get_qvalue(self.last_state, self.last_action)
+			possible_returns = [self.get_qvalue(new_state, a) for a in self.possible_actions()]
+			max_return = max(possible_returns) if possible_returns else 0
+			self.qtable[(self.last_state, self.last_action)] = current_value + self.alpha * (self.reward + self.gamma *
+																							 max_return - current_value)
+
+	def get_qvalue(self, state, action):
+		"""
+		Returns the Q-value for a state-action pair if it exists, otherwise the value is initialized with 0.1
+		in order to encourage exploration of new states
+		:param state: Board state as a tuple
+		:param action: Action as tuple (row, column)
+		:return: Q-value for state-action pair
+		"""
+		board_state = tuple(map(tuple, state))
+		if (board_state, action) not in self.qtable:
+			self.qtable[(board_state, action)] = 0.1
+		return self.qtable[(board_state, action)]

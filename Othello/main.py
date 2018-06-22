@@ -23,8 +23,10 @@ if __name__ == '__main__':
 	game_results = {}  # Storage for game results
 
 	# Initialize game and players; set DQN agents to True if they are to be trained
-	player1 = DQNAgent('black', True)
-	player2 = DQNAgent('white', True)
+	# player1 = DQNAgent('black', True)
+	# player2 = DQNAgent('white', True)
+	player1 = QAgent('black', True)
+	player2 = QAgent('white', True)
 	game = OthelloGame(player1, player2)
 
 	# Start measuring time
@@ -39,7 +41,7 @@ if __name__ == '__main__':
 		game_results[str(episode + 1)] = result
 		print("Episode {} finished after {} black moves".format(episode, result["black"]["moves"]))
 
-		# Store results every 10,000 steps
+		# Store results every 5,000 steps
 		if (episode + 1) % 5000 == 0:
 			cpu_time = process_time() - cpu_start
 			clock_time = perf_counter() - clock_start
