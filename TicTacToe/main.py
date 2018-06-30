@@ -26,6 +26,10 @@ if __name__ == '__main__':
 	# Initialize game and players; set agents to True if they are to be trained
 	player1 = QAgent('X', True)
 	player2 = QAgent('O', True)
+	# Comment the previous lines and uncomment the following lines to use SARSA agent; both agents can also be mixed
+	# player1 = SarsaAgent('X', True)
+	# player2 = SarsaAgent('O', True)
+
 	game = TicTacToeGame(player1, player2)
 
 	# Start measuring time
@@ -47,13 +51,13 @@ if __name__ == '__main__':
 	game_results['-1'] = {"cpu-time": cpu_time,
 						  "clock-time": clock_time}
 	# Write all results into a file
-	with open("training_results/ttt_results_{}_{}-vs-{}.json".format(EPISODES, player1.method, player2.method),
+	with open("ttt_results_{}_{}-vs-{}.json".format(EPISODES, player1.method, player2.method),
 			  "w") as file:
 		file.write(json.dumps(game_results, indent=3, sort_keys=True))
 	# Write q-tables of players into a file
-	with open("training_results/ttt_table_{}_{}_{}.json".format(player1.mark, player1.method, EPISODES), "w") as file:
+	with open("ttt_table_{}_{}_{}.json".format(player1.mark, player1.method, EPISODES), "w") as file:
 		file.write(player1.print_qtable())
-	with open("training_results/ttt_table_{}_{}_{}.json".format(player2.mark, player2.method, EPISODES), "w") as file:
+	with open("ttt_table_{}_{}_{}.json".format(player2.mark, player2.method, EPISODES), "w") as file:
 		file.write(player2.print_qtable())
 
 	print("Training finished. Game results saved")
