@@ -14,9 +14,9 @@ import json
 import collections as coll
 import matplotlib.pyplot as plt
 
-# SPECIFY FILES HERE
-file = 'ttt_results_20000_SARSA-vs-SARSA.json'
-q_table = 'ttt_table_X_SARSA_20000.json'
+# ****************** SPECIFY FILES HERE ****************** #
+file = 'ttt_results_80000_QL-vs-Random.json'
+q_table = 'ttt_table_X_QL-vs-Random_80000.json'
 
 # Read in files
 with open(file) as f:
@@ -91,6 +91,8 @@ plt.plot(episodes, rewards_o, label='Player O', color='blue')
 plt.ylabel('Cumulative reward')
 plt.xlabel('Episode')
 axes = plt.gca()
-axes.set_ylim([-10000, 40000])
+axes.set_ylim([0, 20000])
 plt.legend(loc="upper left")
-plt.show()
+name = file[:-5] if file.endswith('.json') else file
+plt.savefig('{}.png'.format(name))
+plt.close()
