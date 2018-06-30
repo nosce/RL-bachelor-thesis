@@ -23,10 +23,12 @@ if __name__ == '__main__':
 	game_results = {}  # Storage for game results
 
 	# Initialize game and players; set DQN agents to True if they are to be trained
-	# player1 = DQNAgent('black', True)
-	# player2 = DQNAgent('white', True)
-	player1 = QAgent('black', True)
-	player2 = QAgent('white', True)
+	player1 = DQNAgent('black', True)
+	player2 = DQNAgent('white', True)
+	# Alternatively a normal Q-learning agent can be trained by commenting the previous lines
+	# and uncommenting the following lines
+	# player1 = QAgent('black', True)
+	# player2 = QAgent('white', True)
 	game = OthelloGame(player1, player2)
 
 	# Start measuring time
