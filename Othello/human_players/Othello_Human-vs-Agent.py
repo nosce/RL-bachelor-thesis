@@ -1,7 +1,7 @@
 import pygame
+from pygame.locals import *
 import sys
 import numpy as np
-from pygame.locals import *
 
 # GUI configuration
 WHITE = (255, 255, 255)
@@ -19,7 +19,7 @@ pygame.display.set_caption('Othello')
 
 class OthelloGame(object):
 	def __init__(self):
-		self.player_b = Player('black')
+		self.player_b = Agent('black')
 		self.player_w = Player('white')
 
 	def play_game(self):
@@ -60,8 +60,15 @@ class OthelloGame(object):
 					else:
 						current_player = self.player_w if current_player == self.player_b else self.player_b
 
+				# Moves of agent
+				if isinstance(current_player, Agent):
+					move = current_player.make_move()
+					valid_move, black, white = game_board.update_board(move, current_player)
+					if valid_move:
+						current_player = self.player_w if current_player == self.player_b else self.player_b
+
+				# Handle input of human player
 				for event in pygame.event.get():
-					# Wait for input
 					if event.type == QUIT or (event.type == KEYUP and event.key == K_ESCAPE):
 						pygame.quit()
 						sys.exit()
@@ -69,13 +76,15 @@ class OthelloGame(object):
 						mouse_x, mouse_y = event.pos
 						# Restart game if restart button is clicked
 						play_again = restart.collidepoint(mouse_x, mouse_y)
-						# Check for board input if the game is running
-						if not game_board.gameover():
-							move = game_board.get_clicked_field(mouse_x, mouse_y)
-							valid_move, black, white = game_board.update_board(move, current_player)
-							# Switch current player after a valid move
-							if valid_move and not game_board.gameover():
-								current_player = self.player_w if current_player == self.player_b else self.player_b
+						# Get clicked field of human player
+						if isinstance(current_player, Player):
+							if not game_board.gameover():
+								move = game_board.get_clicked_field(mouse_x, mouse_y)
+								valid_move, black, white = game_board.update_board(move, current_player)
+								# Switch current player after a valid move
+								if valid_move and not game_board.gameover():
+									current_player = self.player_w if current_player == self.player_b else self.player_b
+
 					# Redisplay
 					pygame.draw.rect(screen, WHITE, (75, 620, WINDOW[0], 35))
 					message = font.render("Black stones: {}  |  White stones: {}".format(black, white), True, DARKGRAY)
@@ -111,7 +120,12 @@ class Board(object):
 			self.fields[field_x, field_y].draw_mark(player)
 
 	def get_clicked_field(self, mouse_x, mouse_y):
-		# Returns the id of the clicked field
+		"""
+		Returns the id of the clicked field (needed only for human players)
+		:param mouse_x: x-coordinate of the mouse cursor
+		:param mouse_y: y-coordinate of the mouse cursor
+		:return: Field id as tuple; if no field is clicked (-1,-1) is returned
+		"""
 		for field_id, field in self.fields.items():
 			if field.is_clicked(mouse_x, mouse_y):
 				return field_id
@@ -200,6 +214,7 @@ class Field(object):
 	"""
 	Represents a field on the board graphically
 	"""
+
 	def __init__(self, pos_x, pos_y):
 		self.x = pos_x
 		self.y = pos_y
@@ -248,6 +263,7 @@ class Player(object):
 	Represents a player in the game. The black player's ID is 1, the white player's ID is -1, The IDs are used to
 	mark the position of the player's stones on the board.
 	"""
+
 	def __init__(self, colour):
 		self.id = 1 if colour == 'black' else -1
 		self.colour = colour
@@ -269,6 +285,21 @@ class Player(object):
 		# Log whether there is any valid move for the player
 		state.no_moves_possible[self.id] = True if len(self.valid_moves) == 0 else False
 		return self.valid_moves
+
+
+class Agent(Player):
+	# Selects a random action
+	def __init__(self, mark):
+		Player.__init__(self, mark)
+		self.state_prev = None
+		self.state_curr = None
+
+	def make_move(self):
+		# Makes a random move
+		if len(self.valid_moves) > 0:
+			return tuple(self.valid_moves[np.random.choice(len(self.valid_moves))])
+		else:
+			return -1, -1
 
 
 # Start application
