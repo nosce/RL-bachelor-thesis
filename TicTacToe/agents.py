@@ -4,10 +4,10 @@ __Player: Serves as parent class for all agents and implements common functions 
 __RandomAgent: This agents makes random moves based on all valid moves in a certain board state
 __QAgent: This agent uses Q-learning to store and update Q-values for state-action-pairs. When initializing the agent,
 			it can be specified whether the agent should be trained (True) or a stored Q-table should be loaded.
-			The stored Q-table must be specified in a file: training_results/qtable.json
+			The stored Q-table must be stored in the same directory a file "qtable.json"
 __SarsaAgent: This agent uses SARSA to store and update Q-values for state-action-pairs. When initializing the agent,
 			it can be specified whether the agent should be trained (True) or a stored Q-table should be loaded.
-			The stored Q-table must be specified in a file: training_results/sarsa-table.json
+			The stored Q-table must be stored in the same directory in a file "sarsa-table.json"
 """
 
 import numpy as np
@@ -123,7 +123,14 @@ class QAgent(Player):
 		self.gamma = 0.9  # discount factor for future rewards
 		self.train = train
 		if not self.train:
-			self.load_table('training_results/qtable.json')
+			try:
+				self.load_table('qtable.json')
+			except FileNotFoundError:
+				print("File 'qtable.json' not found in this directoy.")
+				exit()
+			except Exception as e:
+				print("Error when loading the file: ", e)
+				exit()
 
 	def reset_for_new_game(self, epsilon, alpha):
 		"""
@@ -215,7 +222,14 @@ class SarsaAgent(Player):
 		self.current_action = None
 		self.train = train
 		if not self.train:
-			self.load_table('training_results/sarsa-table.json')
+			try:
+				self.load_table('sarsa-table.json')
+			except FileNotFoundError:
+				print("File 'qtable.json' not found in this directoy.")
+				exit()
+			except Exception as e:
+				print("Error when loading the file: ", e)
+				exit()
 
 	def reset_for_new_game(self, epsilon, alpha):
 		"""
