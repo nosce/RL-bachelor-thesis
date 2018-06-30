@@ -7,7 +7,7 @@ This repo contains projects that I have implemented for my bachelor thesis on re
 
 
 ## Tic Tac Toe
-This directory an implementation of TicTacToe with different agents
+This directory contains an implementation of TicTacToe with different agents
 - **main**: Starts the game with the specified agents
 - **game**: Contains the game logic
 - **agents**: Contains an agent using Q-learning, a SARSA agent and a random player
