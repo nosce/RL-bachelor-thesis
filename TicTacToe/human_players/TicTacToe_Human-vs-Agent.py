@@ -29,7 +29,15 @@ def play_game():
 		# Initialize board and players
 		player_x = Agent('X')
 		player_o = Player('O')
-		player_x.load_qtable('sarsa-table.json')
+		# Load Q-table
+		try:
+			player_x.load_qtable('qtable.json')
+		except FileNotFoundError:
+			print("File for Q-table not found in this directory")
+			exit()
+		except Exception as e:
+			print("Error while reading the Q-table file: ", e)
+			exit()
 		game_board = Board()
 		players = {player_x.id: player_x.mark, player_o.id: player_o.mark}
 		current_player = player_x
